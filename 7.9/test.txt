@@ -48,6 +48,6 @@ ifnull(t1.MaxLevel,1)as level
 //////////todo
 DataRowComparer.Default
 
-
+ //time = Convert.ToDateTime("2016-07-08 19:29:20"); 
 
 

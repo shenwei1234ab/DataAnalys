@@ -126,4 +126,29 @@ class Util
         return ret;
     }
 
+
+    //得到一天的用户在线状态表格
+    public static bool CreateOnlineTB(DateTime time,ref DataTable tbResult)
+    {
+        //创建5分钟表格
+        string start = time.Year.ToString() + "-" + time.Month.ToString() + "-"
+                + time.Day.ToString() + " " + "00:00:00";
+        DateTime startTime = Convert.ToDateTime(start);
+        DateTime endTime = startTime.AddDays(1);
+        for (DateTime timeIndex = startTime; timeIndex<endTime;)
+        {
+            //创建
+            DataColumn colTime = new DataColumn("dtEventTime");
+            colTime.DataType = typeof(DateTime);
+
+
+
+
+            timeIndex = timeIndex.AddMinutes(5);
+        }
+    
+
+        return true;
+    }
+
 }

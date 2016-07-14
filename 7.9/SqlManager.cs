@@ -8,9 +8,13 @@ using System.Text.RegularExpressions;
 
 public enum SqlCommand
 {
-  
+
+
+
+
     SELECT_ALL_ZONE,
     SELECT_ALL_CHANNEL,
+
 
     
     SELECT_COUNT_REGAccount,
@@ -43,6 +47,15 @@ public enum SqlCommand
     SELECT_ALL_ONLINECNT,           //所有在线区段
     SELECT_SUM_ONLINETIME,
 
+
+
+    //select online status
+    SELECT_ONLINESTATUS_ACCOUNT,
+
+
+
+
+
     SELECT_STILL_LOGINACCOUNT,
     SELECT_STILL_LOGINPLAYER,
     SELECT_STILL_LOGINDEVICE,
@@ -71,6 +84,7 @@ public enum SqlCommand
 
     SELECT_PAY_ACCOUNT,                 //今日付费账号
     SELECT_PAY_Player,
+    SELECT_RechargeGamerInfo,                                 //鲸鱼数据
     SELECT_AddUserRecharges,            //个人充值
     SELECT_AddUserRecharges_ChannelOrderNo,         //查询渠道订单号
 
@@ -121,6 +135,23 @@ class SqlManager
            Log.LogError("LoadDBConfig failed");
            return false;
        }
+
+
+
+       //date1 <x<=date2在线玩家=  date1 <dtLogout<=date2  +   date1<dtLogin<=date2 && dtlogout>=date2
+       RegisterSqlCommand((int)SqlCommand.SELECT_ONLINESTATUS_ACCOUNT,
+        @"select vopenid
+        from  OnlinePlayer 
+        where dtEventTime>?date1 
+        and dtEventTime<=?date2
+        and Channel=?Channel 
+        and SvrAreaId=?SvrAreaId");
+        
+
+
+
+
+
 
         //获取注册玩家的所有区id
        RegisterSqlCommand((int)SqlCommand.SELECT_ALL_ZONE,
@@ -471,6 +502,22 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
         AND account.platformid=?Channel
         AND order_data.zoneid=?SvrAreaId");
 
+        //鲸鱼数据，查询用户所有的充值金额
+       RegisterSqlCommand((int)SqlCommand.SELECT_RechargeGamerInfo,
+        @"SELECT ifnull(sum(product.price),0)as sum 
+        FROM order_data,account,player,product 
+        WHERE order_data.playerid = player.playerid 
+        AND order_data.`status`=2 
+        AND player.ppid = account.ppid 
+        AND product.productid = order_data.productid 
+        AND order_data.`timestamp` <= ?date 
+        AND account.platformid=?Channel
+        AND order_data.zoneid=?SvrAreaId
+		and player.playerid=?playerid;");
+
+
+        
+
 
 
        //个人充值
@@ -481,7 +528,8 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
         WHERE order_data.playerid = player.playerid 
         AND player.ppid = account.ppid 
         AND product.productid = order_data.productid 
-        AND date(order_data.`timestamp`) = date(?date) 
+        AND order_data.`timestamp` > ?lastdate 
+        AND order_data.`timestamp` <= ?date
         AND account.platformid=?Channel
         AND order_data.zoneid=?SvrAreaId");
 
@@ -647,7 +695,7 @@ and dtEventTime <= ?date ");
             {
                 return 0;
             }
-            result = (string)resultTb.Rows[0]["resultName"];
+            result = resultTb.Rows[0][resultName].ToString();
         }
         catch (Exception e)
         {
