@@ -1,24 +1,3 @@
-create table tb1
-(
-	id int
-)
-insert into tb1 values(1);
-insert into tb1 values(2);
-insert into tb1 values(3);
-insert into tb1 values(4);
-create table tb2
-(
-	id int
-)
-insert into tb2 values(3);
-insert into tb2 values(4);
-insert into tb2 values(5);
-insert into tb2 values(6);
-
-//集合运算
-select id from  tb1 where id not in (select id from  tb2);
-
-
 
 
 
@@ -28,5 +7,13 @@ select tb1.id from tb1   left outer join tb2   on tb1.id=tb2.id where tb2.id is 
 
 
 //确认第三方渠道号
-SELECT ifnull(channelid,platformid) from account 
-LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel;
+(SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+
+
+
+
+
+//区分大小写
+SHOW CREATE TABLE PlayerLogin;
+alter table PlayerLogin change vopenid vopenid varchar(64) binary; 

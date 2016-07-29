@@ -30,10 +30,16 @@ public class PcuTimeval:IComparable
             PcuTimeval info = obj as PcuTimeval;
             if (this.m_num > info.m_num)
             {
+                result = 1;
+            }
+            else if (this.m_num < info.m_num)
+            {
+                result = -1;
+            }
+            else{
                 result = 0;
             }
-            else
-                result = 1;
+                
             return result;
         }
         catch (Exception ex) { throw new Exception(ex.Message); }

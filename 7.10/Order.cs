@@ -24,7 +24,7 @@ public enum rechargetState
 public class Order
 {
     public Order(string orderid, string ppid, string userNickname,string playerid,
-        string accountCreateTime, string orderCreateTime, string orderMoney, string channelOrderNo)
+        string accountCreateTime, string orderCreateTime, string orderMoney, string channelOrderNo, string mainChannelNamel)
     {
         m_orderid = orderid;
         m_ppid = ppid;
@@ -35,8 +35,11 @@ public class Order
         m_orderCreateTime = orderCreateTime;
         m_money = orderMoney;
         m_channelOrderNo = channelOrderNo;
+        m_mainChannelName = mainChannelNamel;
     
     }
+
+    public string m_mainChannelName = "";
     public string m_playerid = "";
     public rechargetState m_rechargeState;
     public string m_orderid="";

@@ -1,4 +1,4 @@
-﻿#define _DEBUG
+﻿//#define _DEBUG
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,7 +27,7 @@ namespace ConsoleApplication1
 
         static string m_channelConfigFile = "channel.txt";
         static string m_diamondPayFile = "DiamondPayRecord.txt";
-        static string m_diamondBuyFile = "DiamondBuy.txt";
+        static string m_diamondPresentFile = "DiamondPresentRecord.txt";
         static Dictionary<string, Channel> m_channelMap = new Dictionary<string, Channel>();
         static List<Svr> m_svrList=new List<Svr>();         //区域列表
         static List<Channel> m_chanList = new List<Channel>();//渠道列表
@@ -111,17 +111,11 @@ namespace ConsoleApplication1
                         continue;
                         // return false;
                     }
-
-                    ////渠道Id不存在
-                    //if(m_channelMap[strChId].ChannelId == "?")
-                    //{
-                    //     continue;
-                    //}
                     m_chanList.Add(m_channelMap[strChId]);
                 }
                 
                 //读取DiamondPayRecord
-                 readText = File.ReadAllText(m_diamondPayFile, System.Text.Encoding.Default);
+                readText = File.ReadAllText(m_diamondPayFile, System.Text.Encoding.Default);
                 //反序列化
                  List<DiamondPay> payList = new List<DiamondPay>();
                  payList = JsonConvert.DeserializeObject<List<DiamondPay>>(readText);
@@ -138,6 +132,7 @@ namespace ConsoleApplication1
                      m_diamondPayMap[id] = pay;
                  }
                 //读取DiamondPresentRecord
+                 readText = File.ReadAllText(m_diamondPresentFile, System.Text.Encoding.Default);
                 List<DiamondPresent> presentList = new List<DiamondPresent>();
                 presentList = JsonConvert.DeserializeObject<List<DiamondPresent>>(readText);
                 foreach (var present in presentList)
@@ -152,7 +147,15 @@ namespace ConsoleApplication1
                     }
                     m_diamondPresentMap[id] = present;
                 }
-                 
+               if( !m_userRechargeTask.Init(m_svrList, m_chanList))
+               {
+                   return false;
+               }
+               return true;
+                //if(!m_operationTask.Init(m_svrList,m_chanList))
+                //{
+                //    return false;
+                //}
 
             }
             catch (Exception ex)
@@ -160,7 +163,6 @@ namespace ConsoleApplication1
                 Log.LogError(ex.ToString());
                 return false;
             }
-            return true;
         }
 
 
@@ -187,27 +189,12 @@ namespace ConsoleApplication1
             Log.LogDebug("AddOperationData End");
         }
 
+        static AddUserRechargesTask m_userRechargeTask = new AddUserRechargesTask();
+        static AddOperationDataTask m_operationTask = new AddOperationDataTask();
 
         static void AddUserRechargesTask(DateTime nowTime,DateTime lastTime)
         {
-            Log.SetFileName("AddUserRecharges");
-            Log.LogDebug("AddUserRecharges Start");
-            AnalysisSystem system = new AnalysisSystem();
-            foreach (var svr in m_svrList)
-            {
-                //遍历渠道
-                foreach (var channl in m_chanList)
-                {
-                    system.Init(channl, svr);
-                    //创建订单容器
-                    if (!system.AddUserRecharges(nowTime, lastTime))
-                    {
-                        Log.LogError("AddUserRecharges failed");
-                        continue;
-                    }
-                }
-            }
-            Log.LogDebug("AddUserRecharges End");
+            m_userRechargeTask.RunTask(nowTime, lastTime);
         }
 
 
@@ -300,8 +287,17 @@ namespace ConsoleApplication1
         {
             if (DateTime.Now.Subtract(m_userRecharlastTime).TotalSeconds > m_UserRechargeTimeVal)
             {
-                AddUserRechargesTask(DateTime.Now, m_userRecharlastTime);
-                m_userRecharlastTime = DateTime.Now;
+                DateTime nowTime = DateTime.Now;
+                try
+                { 
+                    AddUserRechargesTask(nowTime, m_userRecharlastTime);
+                }
+                catch(Exception ex)
+                {
+                    Log.SetFileName("Fatal ERROR");
+                    Log.LogError("AddUserRechargesTask fatal error"+ex.ToString());
+                }
+                m_userRecharlastTime = nowTime;
             }
             else
             {
@@ -311,15 +307,32 @@ namespace ConsoleApplication1
 
             if (DateTime.Now.Subtract(m_operationlastTime).TotalSeconds > m_OperationTimeVal)
             {
-                AddOperationDataTask(DateTime.Now);
-                m_operationlastTime = DateTime.Now;
+                DateTime now = DateTime.Now;
+                try
+                {
+                    AddOperationDataTask(now);
+                }
+                catch (Exception ex)
+                {
+                    Log.SetFileName("Fatal ERROR");
+                    Log.LogError("AddOperationDataTask fatal error" + ex.ToString());
+                }
+                m_operationlastTime = now;
             }
            
 
             //每天3：00更新
             if (DateTime.Now > m_everyDay)
             {
-                EveryDayTask();
+                try
+                {
+                    EveryDayTask();
+                }
+                catch(Exception ex)
+                {
+                    Log.SetFileName("Fatal ERROR");
+                    Log.LogError("EveryDayTask fatal error" + ex.ToString());
+                }
                 string day = DateTime.Now.Year.ToString() + "-" + DateTime.Now.Month.ToString() + "-"
             + DateTime.Now.Day.ToString() + " " + m_everyDayTime;
                DateTime dt=  Convert.ToDateTime(day);
@@ -328,6 +341,114 @@ namespace ConsoleApplication1
 
         }
         
+
+
+        static void test(DateTime time)
+        {
+            AnalysisSystem system = new AnalysisSystem();
+            system.m_diamondPayMap = m_diamondPayMap;
+            system.m_diamondPresentMap = m_diamondPresentMap;
+
+
+           // Log.SetFileName("AddOperationData");
+            //Log.LogDebug("AddOperationData Start");
+            //foreach (var svr in m_svrList)
+            //{
+            ////遍历渠道
+            //foreach (var channl in m_chanList)
+            //{
+            //    system.Init(channl, svr);
+            //    if (!system.AddOperationData(time))
+            //    {
+            //        Log.LogError("AddOperationData failed");
+            //    }
+            //    Log.LogDebug("AddOperationData End");
+            //}
+            //}
+
+            //test
+             DateTime lastTime = Convert.ToDateTime("2016-07-27 18:16:38");
+            DateTime FinTime = Convert.ToDateTime("2016-07-27 22:19:38");
+            DateTime nowTime = lastTime.AddMinutes(1);
+            while (nowTime<=FinTime)
+            {
+                 AddUserRechargesTask(nowTime, lastTime);
+                 lastTime = nowTime;
+                 nowTime = nowTime.AddMinutes(1);
+            }
+            return;
+            Log.SetFileName("EveryDay");
+            Log.LogDebug("EveryDay Start");
+            //遍历区
+            foreach (var svr in m_svrList)
+            {
+                //遍历渠道
+                foreach (var channl in m_chanList)
+                {
+                    system.Init(channl, svr);
+                    //DateTime time = DateTime.Now.AddDays(0);
+                    if (!system.AddGamersRetention(time))
+                    {
+                        Log.LogError("AddGamersRetention failed");
+                    }
+                    if (!system.AddGamersRoleRetention(time))
+                    {
+                        Log.LogError("AddGamersRoleRetention failed");
+                    }
+                    if (!system.AddGamersEquipRetention(time))
+                    {
+                        Log.LogError("AddGamersEquipRetention failed");
+                    }
+                    if (!system.AddCommonLtvWorth(time))
+                    {
+                        Log.LogError("AddCommonLtvWorth failed");
+                    }
+                    if (!system.AddGamersDayWorth(time))
+                    {
+                        Log.LogError("AddGamersDayWorth failed");
+                    }
+                    if (!system.AddEveryDayAddGamerLevelFenbu(time))
+                    {
+                        Log.LogError("AddEveryDayAddGamerLevelFenbu failed");
+                    }
+                    if (!system.AddAllGemerLevelFenbu(time))
+                    {
+                        Log.LogError("AddAllGemerLevelFenbu failed");
+                    }
+                    if (!system.AddGamerLevelChanges(time))
+                    {
+                        Log.LogError("AddGamerLevelChanges failed");
+                    }
+                    if (!system.AddGamerLevelLeft(time))
+                    {
+                        Log.LogError("AddGamerLevelLeft failed");
+                    }
+                    if (!system.AddVirtualCornCost(time))
+                    {
+                        Log.LogError("AddVirtualCornCost failed");
+                    }
+                    if (!system.AddRechargeGamerInfo(time))
+                    {
+                        Log.LogError("AddRechargeGamerInfo failed");
+                    }
+              }
+            }
+            Log.LogDebug("EveryDay End");
+            Log.SetFileName("AddOperationData");
+            Log.LogDebug("AddOperationData Start");
+            Channel chan = new Channel();
+            chan.ChannelId = "CH0050";
+            chan.Id = "1";
+            Svr svrID = new Svr(10012);
+            svrID.m_SvrAreaId = 10012;
+            system.Init(chan, svrID);
+            if (!system.AddOperationData(time))
+            {
+                Log.LogError("AddOperationData failed");
+            }
+            Log.LogDebug("AddOperationData End");
+
+        }
         static void Main(string[] args)
         {
             //ppidToOpenId();
@@ -351,12 +472,16 @@ namespace ConsoleApplication1
                 return;
             }
 
-            while(true)
+            //test
+            //DateTime time = Convert.ToDateTime("2016-07-25 11:48:00");
+            //test(time);
+            while (true)
             {
                 Update();
             }
+            
 
-             }
         }
+    }
     
 }

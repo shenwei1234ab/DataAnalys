@@ -5,6 +5,15 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Xml;
+using System.Collections.Generic;
+
+public class TaskData
+{
+    public Channel m_channel;       //渠道
+    public Svr m_svr;           //区
+    public string m_postSvrInfo;
+    public  Dictionary<string, Order> m_orderDatas = new Dictionary<string, Order>();
+}
 //区
 public class Task
 {
@@ -13,23 +22,21 @@ public class Task
     /// </summary>
     /// <param name="resultMsg"></param>
     /// <returns>ResultCode为1代表成功，0代表失败；ResultMsg：请求成功则为Success，请求失败则为异常信息内容；</returns>
-
-    public int Post(ref string resultMsg)
+    public int Post(TaskData data,ref string resultMsg)
     {
         string posUrl = m_baseURL + m_actionNameURL;
         string strResult;
         int resultCode = 1;
         try
         {
-            strResult = PostWebRequest(posUrl, m_postData, m_defaultEncode);
-#if _DEBUG
-          
-#else
+            strResult = PostWebRequest(data,posUrl, m_postData, m_defaultEncode);
+if(Setting.Debug())
+        {
+            return 1;
+        }
             JObject obj = JObject.Parse(strResult);
             resultCode = (int)obj["ResultCode"];
             resultMsg = (string)obj["ResultMsg"];
-#endif
-
         }
         catch (WebException ex)
         {
@@ -46,19 +53,18 @@ public class Task
 
 
     #region 内部方法
-    protected string PostWebRequest(string postUrl, string paramData, Encoding dataEncode)
+    protected string PostWebRequest(TaskData data,string postUrl, string paramData, Encoding dataEncode)
     {
         string ret = string.Empty;
         try
         {
             byte[] byteArray = dataEncode.GetBytes(paramData); //传值参数转化byte数组
-#if _DEBUG
-            
-        
-            Log.LogDebug("postUrl:" + postUrl + "svrid:" + m_svr.m_SvrAreaId + "channel:" + m_channel.Id + "data:" + paramData);
-            return "test";
-#else
-            Log.LogDebug("postUrl:" + postUrl + "svrid:" + m_svr.m_SvrAreaId + "channel:" + m_channel.Id + "data:" + paramData);
+            if (Setting.Debug())
+            {
+                Log.LogDebug("postUrl:" + postUrl + "svrid:" + data.m_svr.m_SvrAreaId + "channel:" + data.m_channel.Id + "data:" + paramData);
+                return "test";
+            }
+            Log.LogDebug("postUrl:" + postUrl + "svrid:" + data.m_svr.m_SvrAreaId + "channel:" + data.m_channel.Id + "data:" + paramData);
             HttpWebRequest request = (HttpWebRequest)WebRequest.Create(new Uri(postUrl)); //创建HttpWebRequest实例
             request.Method = "POST"; //请求方式
             request.ContentType = "application/x-www-form-urlencoded";//设置内容类型
@@ -81,7 +87,6 @@ public class Task
             ret = Reader.ReadInnerXml();//取出Content中的Json数据
             Reader.Close();
             s.Close();
-#endif
         }
         catch (WebException ex)
         {
@@ -151,10 +156,10 @@ public class Task
     protected string m_gameName = "我的美女老师";
     // protected string m_gameServerIP = "123.206.200.181:8801";
 
-    protected string m_postSvrInfo = "";//要提交的gamesvrip=127.0.0.+"区Id":"渠道"
+   // protected string m_postSvrInfo = "";//要提交的gamesvrip=127.0.0.+"区Id":"渠道"
 
-    public Channel m_channel;       //渠道
-    public Svr m_svr;           //区
+   // public Channel m_channel;       //渠道
+   // public Svr m_svr;           //区
 
     protected string m_gameServerName = "";
     protected string m_userToken = "c2ab32e4t673802c";
@@ -163,14 +168,23 @@ public class Task
     protected string m_platform = "中文在线";
 
 
+    protected List<TaskData> m_taskData = new List<TaskData>();
 
+   
 
-
-    public virtual  bool Init(Channel channel, Svr svr)
+    public virtual bool Init(List<Svr> svrList, List<Channel> chanList)
     {
-        m_channel = channel;
-        m_svr = svr;
-        m_postSvrInfo = m_svr.m_SvrAreaName + ":" + m_channel.ChannelId;
+        foreach (var svr in svrList)
+        {
+            foreach (var chan in chanList)
+            {
+                TaskData data= new TaskData();
+                data.m_channel = chan;
+                data.m_svr = svr;
+                data.m_postSvrInfo = svr.m_SvrAreaName + ":" + chan.ChannelId;
+                m_taskData.Add(data);
+            }
+        }
         return true;
     }
 

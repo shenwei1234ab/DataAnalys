@@ -36,6 +36,7 @@ public enum SqlCommand
     SELECT_COUNT_NEWAccount,
     SELECT_NEWAccount,
     SELECT_COUNT_NEWPLAYER,
+    SELECT_NEWPLAYER,
     SELECT_COUNT_NEWDEVICE, 
 
 
@@ -87,6 +88,7 @@ public enum SqlCommand
 
  
     SELECT_PAY_ACCOUNT,                 //今日付费账号
+    SELECT_PAY_ACCOUNTBY_PPID,                                    //某个账号今日的付费
     SELECT_PAY_Player,
     SELECT_RechargeGamerInfo,                                 //鲸鱼数据
     SELECT_AddUserRecharges,            //个人充值
@@ -233,7 +235,9 @@ class SqlManager
        RegisterSqlCommand((int)SqlCommand.SELECT_LOGINAccount, 
         @"select DISTINCT vopenid  as openid  
         from  PlayerLogin
-        where date(dtEventTime)=date(?datetime)");
+        where date(dtEventTime)=date(?date) 
+        and Channel=?Channel 
+        and SvrAreaId=?SvrAreaId");
 
 
 
@@ -245,12 +249,7 @@ class SqlManager
         and Channel=?Channel 
         and SvrAreaId=?SvrAreaId ");
 
-//       RegisterSqlCommand((int)SqlCommand.SELECT_LOGINPLAYER,
-//        @"select DISTINCT vopenid ,SvrAreaId  
-//        from  PlayerLogin 
-//        where date(dtEventTime)=date(?date) 
-//        and Channel=?Channel 
-//        and SvrAreaId=?SvrAreaId ");
+
         RegisterSqlCommand((int)SqlCommand.SELECT_LOGINPLAYER,
         @"select  vopenid ,SvrAreaId,Max(dtEventTime) as dtEventTime
         from  PlayerLogin 
@@ -302,7 +301,18 @@ class SqlManager
         (select DISTINCT DeviceId from PlayerRegister where date(dtEventTime)<date(?date) and Channel=?Channel and SvrAreaId=?SvrAreaId)");
 
 
-       //某日新登设备 = 某日注册的设备 - DeviceId已经注册过的
+       RegisterSqlCommand((int)SqlCommand.SELECT_NEWPLAYER,
+      @"select DISTINCT vopenid,SvrAreaId
+        from  PlayerRegister 
+        where date(dtEventTime)=date(?date)
+        and Channel=?Channel  
+        and SvrAreaId=?SvrAreaId
+        and DeviceId not in
+        (select DISTINCT DeviceId from PlayerRegister where date(dtEventTime)<date(?date) and Channel=?Channel and SvrAreaId=?SvrAreaId)");
+
+
+
+       //某日新登设备 = 某日的设备 - DeviceId已经注册过的
        RegisterSqlCommand((int)SqlCommand.SELECT_COUNT_NEWDEVICE,
         @"select count(DISTINCT DeviceId )as count 
         from  PlayerRegister 
@@ -317,7 +327,7 @@ class SqlManager
        RegisterSqlCommand((int)SqlCommand.SELECT_STILL_LOGINACCOUNT,
         @"SELECT count(*) as count 
         FROM 
-        (select DISTINCT vopenid COLLATE utf8_bin as openid from  PlayerRegister where date(dtEventTime)=date(?date)  and Channel=?Channel and SvrAreaId=?SvrAreaId and DeviceId not in(select DISTINCT DeviceId from PlayerRegister where date(dtEventTime)<date(?date) and Channel=?Channel and SvrAreaId=?SvrAreaId))t1,
+        (select DISTINCT vopenid  as openid from  PlayerRegister where date(dtEventTime)=date(?date)  and Channel=?Channel and SvrAreaId=?SvrAreaId and DeviceId not in(select DISTINCT DeviceId from PlayerRegister where date(dtEventTime)<date(?date) and Channel=?Channel and SvrAreaId=?SvrAreaId))t1,
         (select DISTINCT vopenid  as openid from  PlayerLogin where date(dtEventTime)=date(?datelogin) and Channel=?Channel and SvrAreaId=?SvrAreaId)t2
         where t1.openid = t2.openid");
 
@@ -451,6 +461,37 @@ on t1.vopenid=t2.vopenid and t1.SvrAreaId = t2.SvrAreaId");
 
 
 
+
+       //鲸鱼数据
+       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_DEVICEID,
+           @"SELECT SystemHardware from PlayerLogin 
+        where vopenid = ?openid 
+        and Channel=?Channel
+         and SvrAreaId=?SvrAreaId
+        and dtEventTime <= ?date 
+        order by dtEventTime desc LIMIT 1");
+
+
+       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_LEVEL,
+           @"SELECT ifnull(Max(AfterLevel),1)as AfterLevel 
+            from PlayerLvUpFlow 
+            where vopenid= ?openid 
+            and SvrAreaId = ?SvrAreaId
+            and dtEventTime <= ?date");
+
+
+       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_DIAMOND_CONSUMCOST,
+@" SELECT ifnull(sum(Price),0)as sum
+from DiamondPayRecord 
+where vopenid= ?openid 
+and SvrAreaId = ?SvrAreaId
+and dtEventTime <= ?date ");
+
+
+
+
+
+
         //////////////钻石Pay记录
        RegisterSqlCommand((int)SqlCommand.SELECT_DIAMONDPAY,
 @"select DiamondBuyItemType,t1.vopenid,t1.SvrAreaId
@@ -485,10 +526,12 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
         FROM 
         order_data,
         player,
-        product 
-        account,
+        product,
+        (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
         WHERE order_data.playerid = player.playerid 
-        AND order_data.`status`=2 AND player.ppid = account.ppid 
+        AND order_data.`status`=2 
+        AND player.ppid = account.ppid 
         AND product.productid = order_data.productid 
         AND date(order_data.`timestamp`) = date(?date) 
         AND  account.platformid=?Channel 
@@ -496,33 +539,64 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
         group by player.ppid;");
       
 
+        //
+       RegisterSqlCommand((int)SqlCommand.SELECT_PAY_ACCOUNTBY_PPID,
+      @"SELECT price  as sum  
+        FROM 
+        order_data,
+        player,
+        product,
+        (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+        WHERE order_data.playerid = player.playerid 
+        AND order_data.`status`=2 
+        AND player.ppid = account.ppid 
+        AND product.productid = order_data.productid 
+        AND date(order_data.`timestamp`) = date(?date) 
+        AND  account.platformid=?Channel 
+        AND  order_data.zoneid=?SvrAreaId
+        AND account.ppid = ?ppid");
 
-        //date1 - date2 所有付费角色信息
+
+
+
+        // 所有付费角色信息
        RegisterSqlCommand((int)SqlCommand.SELECT_PAY_Player,
-        @"SELECT order_data.orderid,account.ppid,player.diamond, player.zoneid,player.playerid,account.nickname,product.price ,order_data.timestamp,
-        order_data.status 
-        FROM order_data,account,player,product 
+        @"SELECT player.playerid,ifnull(SUM(product.price),0) as sum
+        FROM 
+		order_data,
+		player,
+		product,
+		(SELECT ifnull(channelid,platformid)as platformid,ppid,nickname from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
         WHERE order_data.playerid = player.playerid 
         AND order_data.`status`=2 
         AND player.ppid = account.ppid 
         AND product.productid = order_data.productid 
-        AND date(order_data.`timestamp`) >= date(?date1) 
-        AND date(order_data.`timestamp`) <= date(?date2)
-        AND account.platformid=?Channel
-        AND order_data.zoneid=?SvrAreaId");
-
-        //鲸鱼数据，查询用户所有的充值金额
-       RegisterSqlCommand((int)SqlCommand.SELECT_RechargeGamerInfo,
-        @"SELECT ifnull(sum(product.price),0)as sum 
-        FROM order_data,account,player,product 
-        WHERE order_data.playerid = player.playerid 
-        AND order_data.`status`=2 
-        AND player.ppid = account.ppid 
-        AND product.productid = order_data.productid 
-        AND order_data.`timestamp` <= ?date 
+        AND date(order_data.`timestamp`) = date(?date) 
         AND account.platformid=?Channel
         AND order_data.zoneid=?SvrAreaId
-		and player.playerid=?playerid;");
+	    group by playerid");
+
+
+        //鲸鱼数据，查询充值用户信息
+       RegisterSqlCommand((int)SqlCommand.SELECT_RechargeGamerInfo,
+        @"SELECT account.ppid,max(player.diamond)as diamond,player.playerid,account.nickname,SUM(product.price )as sum,Max(order_data.timestamp) as `timestamp`
+        FROM 
+		order_data,
+		player,
+		product,
+		(SELECT ifnull(channelid,platformid)as platformid,ppid,nickname from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+        WHERE order_data.playerid = player.playerid 
+        AND order_data.`status`=2 
+        AND player.ppid = account.ppid 
+        AND product.productid = order_data.productid 
+        AND date(order_data.`timestamp`) <= date(?date) 
+        AND account.platformid=?Channel
+        AND order_data.zoneid=?SvrAreaId
+        AND player.playerid=?playerid
+	    group by playerid");
 
 
         
@@ -530,17 +604,58 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
 
 
        //个人充值
-         RegisterSqlCommand((int)SqlCommand.SELECT_AddUserRecharges,
-                @"SELECT order_data.orderid,account.ppid,player.diamond, player.zoneid,player.playerid,account.nickname,product.price ,order_data.timestamp as orderCreateTime,account.timestamp as accountCreateTime,
-        order_data.status
-        FROM order_data,account,player,product
-        WHERE order_data.playerid = player.playerid 
-        AND player.ppid = account.ppid 
-        AND product.productid = order_data.productid 
-        AND order_data.`timestamp` > ?lastdate 
-        AND order_data.`timestamp` <= ?date
-        AND account.platformid=?Channel
-        AND order_data.zoneid=?SvrAreaId");
+//       RegisterSqlCommand((int)SqlCommand.SELECT_AddUserRecharges,
+//      @"SELECT order_data.orderid,account.ppid,player.diamond, player.zoneid,player.playerid,account.nickname,product.price ,order_data.timestamp as orderCreateTime,account.timestamp as accountCreateTime,
+//        order_data.status
+//        FROM 
+//        order_data,
+//        product,
+//        player,
+// (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+//LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+//        WHERE order_data.playerid = player.playerid 
+//        AND player.ppid = account.ppid 
+//        AND product.productid = order_data.productid 
+//        AND order_data.`timestamp` > ?lastdate 
+//        AND order_data.`timestamp` <= ?date
+//        AND account.platformid=?Channel
+//        AND order_data.zoneid=?SvrAreaId");
+
+
+
+       RegisterSqlCommand((int)SqlCommand.SELECT_AddUserRecharges,
+            @"SELECT
+	order_data.orderid,
+	order_data.ppid,
+	order_data.playerid,
+	order_data.zoneid,
+	order_data.productid,
+	order_data.`status`,
+	order_data.`timestamp`  as orderCreateTime,
+	order_third.pforderid,
+	account.platformid,
+	account.channelLabel,
+    account.timestamp as accountCreateTime,
+	channelLabel_lj.channelid,
+	order_third.pforderid_sec,
+	product.price,
+	account.nickname
+FROM
+	order_data
+LEFT JOIN order_third ON order_data.orderid = order_third.cporderid
+LEFT JOIN account ON order_data.ppid = account.ppid
+LEFT JOIN channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel
+Left JOIN product on order_data.productid = product.productid
+WHERE
+	order_data.`timestamp` >?lastdate
+	AND order_data.`timestamp` <= ?date
+	AND order_data.zoneid=?SvrAreaId
+	and (account.platformid=?Channel or channelLabel_lj.channelid=?Channel)");
+
+
+
+
+
 
 
 
@@ -554,7 +669,12 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
        //date1 - date2 所有付费账号付费次数
        RegisterSqlCommand((int)SqlCommand.SELECT_PAY_ACCOUNT_COUNT,
         @"SELECT account.ppid , count(account.ppid)as count   
-        FROM order_data,account,player,product 
+        FROM 
+        order_data,
+        product,
+        player,
+         (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account 
         WHERE order_data.playerid = player.playerid 
         AND date(order_data.`timestamp`) >= date(?date1) 
         AND date(order_data.`timestamp`) <= date(?date2) 
@@ -572,9 +692,30 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
        RegisterSqlCommand((int)SqlCommand.SELECT_FIRSTPAY_ACCOUNT,
            @"select tb1.ppid,tb1.sumtoday as sum
         from 
-        (SELECT player.ppid,sum(price)as sumtoday  FROM order_data,account,player,product WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) = date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid  and account.platformid=?Channel and order_data.zoneid=?SvrAreaId group by player.ppid)tb1 
+        (SELECT player.ppid,sum(price)as sumtoday  
+        FROM 
+        order_data,
+        product,
+        player,
+         (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account 
+        WHERE order_data.playerid = player.playerid 
+    AND date(order_data.`timestamp`) = date(?date) 
+    AND order_data.`status`=2 
+    AND player.ppid = account.ppid 
+    AND product.productid = order_data.productid  
+    and account.platformid=?Channel 
+    and order_data.zoneid=?SvrAreaId 
+    group by player.ppid)tb1 
         left outer join
-        (SELECT player.ppid,sum(price)as sumbefore  FROM order_data,account,player,product WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) < date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid  and account.platformid=?Channel and order_data.zoneid=?SvrAreaId  group by player.ppid)tb2 
+        (SELECT player.ppid,sum(price)as sumbefore 
+        FROM 
+        order_data,
+        product,
+        player,
+        (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+        WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) < date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid  and account.platformid=?Channel and order_data.zoneid=?SvrAreaId  group by player.ppid)tb2 
         on tb1.ppid=tb2.ppid where tb2.ppid is NULL;");
 
 
@@ -583,13 +724,29 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
        RegisterSqlCommand((int)SqlCommand.SELECT_FIRSTPAY_PLAYER,
         @"select tb1.playerid,tb1.sumtoday as sum 
         from 
-        (SELECT player.playerid,sum(price) as sumtoday  FROM order_data,account,player,product WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) = date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid  and account.platformid=?Channel 
+        (SELECT player.playerid,sum(price) as sumtoday  
+    FROM order_data,
+    product,
+    player,
+ (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+    WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) = date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid  and account.platformid=?Channel 
             and  order_data.zoneid=?SvrAreaId group by player.playerid)tb1
         left outer join 
-        (SELECT distinct player.playerid  FROM order_data,account,player,product WHERE order_data.playerid = player.playerid AND date(order_data.`timestamp`) < date(?date) AND order_data.`status`=2 AND player.ppid = account.ppid AND product.productid = order_data.productid 
-           and account.platformid=?Channel 
-           and  order_data.zoneid=?SvrAreaId)tb2 
-        on tb1.playerid=tb2.playerid where tb2.playerid is NULL ;");
+    (SELECT distinct player.playerid  
+    FROM order_data,
+    product,
+    player,
+ (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
+WHERE order_data.playerid = player.playerid 
+AND date(order_data.`timestamp`) < date(?date)
+AND order_data.`status`=2 
+AND player.ppid = account.ppid 
+AND product.productid = order_data.productid 
+and account.platformid=?Channel 
+and  order_data.zoneid=?SvrAreaId)tb2    
+on tb1.playerid=tb2.playerid where tb2.playerid is NULL ;");
 
 
 
@@ -601,9 +758,15 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
 
 
        //某个ppid在date1 到date2 之间的付费
-       RegisterSqlCommand((int)SqlCommand.SELECT_LTV_ACCOUNT_PAY, 
-        @"SELECT ifnull(sum(price),0) as sum  
-        FROM order_data,account,player,product
+       RegisterSqlCommand((int)SqlCommand.SELECT_LTV_ACCOUNT_PAY,
+        @"SELECT 
+        ifnull(sum(price),0) as sum  
+        FROM
+        order_data,
+        product,
+        player,
+ (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account
         WHERE order_data.playerid = player.playerid 
         AND date(order_data.`timestamp`) >= date(?date1) 
         AND date(order_data.`timestamp`) <= date(?date2) 
@@ -612,13 +775,19 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
         AND product.productid = order_data.productid  
         AND  player.ppid=?ppid 
         AND  account.platformid=?Channel
-         AND order_data.zoneid=?SvrAreaId;");
+        AND order_data.zoneid=?SvrAreaId;");
 
 
         //某日某个ppid(账户)的付费
        RegisterSqlCommand((int)SqlCommand.SELECT_ACCOUNT_PAY,
-           @"SELECT ifnull(sum(price),0) as sum  
-        FROM order_data,product,account,player 
+           @"SELECT
+        ifnull(sum(price),0) as sum  
+        FROM 
+        order_data,
+        product,
+        player,
+ (SELECT ifnull(channelid,platformid)as platformid,ppid from account 
+LEFT JOIN  channelLabel_lj ON account.channelLabel = channelLabel_lj.channelLabel)as account 
         WHERE  order_data.`status`=2
         AND product.productid = order_data.productid 
         AND date(order_data.`timestamp`) = date(?date)
@@ -628,30 +797,7 @@ where t1.vopenid = t2.vopenid  and t1.SvrAreaId = t2.SvrAreaId
          AND  order_data.zoneid=?SvrAreaId  ;"); 
 
 
-        //鲸鱼数据
-       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_DEVICEID,
-           @"SELECT SystemHardware from PlayerLogin 
-        where vopenid = ?openid 
-        and Channel=?Channel
-         and SvrAreaId=?SvrAreaId
-        and dtEventTime <= ?date 
-        order by dtEventTime desc LIMIT 1");
-
-
-       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_LEVEL,
-           @"SELECT ifnull(Max(AfterLevel),1)as AfterLevel 
-            from PlayerLvUpFlow 
-            where vopenid= ?openid 
-            and SvrAreaId = ?SvrAreaId
-            and dtEventTime <= ?date");
-
-
-       RegisterSqlCommand((int)SqlCommand.SELECT_RECHARGEPLAYER_DIAMOND_CONSUMCOST,
-@" SELECT ifnull(sum(Price),0)as sum
-from DiamondPayRecord 
-where vopenid= ?openid 
-and SvrAreaId = ?SvrAreaId
-and dtEventTime <= ?date ");
+  
         return true;
     }
 
@@ -682,6 +828,7 @@ and dtEventTime <= ?date ");
     //1 成功
     public int SetAndExecute(SqlCommand cmd, ref DataTable resultTB, params MySql.Data.MySqlClient.MySqlParameter[] parsArray)
     {
+        resultTB.Clear();
         try
         {
             SqlStament st = GetSqlStament(cmd);
@@ -697,6 +844,9 @@ and dtEventTime <= ?date ");
             string msg = "";
             if (!st.Execute(ref resultTB, ref msg))
             {
+                Log.LogError("sqlid:" + cmd );
+                Log.LogError("sqlcommand"+st.GetCommand());
+                Log.LogError("reason:"+msg);
                 return -1;
             }
         }
@@ -719,6 +869,7 @@ and dtEventTime <= ?date ");
     //1 成功
     public int SetAndExecute(SqlCommand cmd, string resultName, ref string result,params MySql.Data.MySqlClient.MySqlParameter[] parsArray)
     {
+
         try
         {
             SqlStament st = GetSqlStament(cmd);
@@ -736,7 +887,8 @@ and dtEventTime <= ?date ");
             string msg = "";
             if (!st.Execute(ref resultTb, ref msg))
             {
-                Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
+                Log.LogError("sqlid:"+cmd+"sqlcommand" + st.GetCommand() + "execute error" + msg);
+
                 return -1;
             }
             if (resultTb.Rows.Count <= 0)
@@ -752,15 +904,6 @@ and dtEventTime <= ?date ");
         }
         return 1;
     }
-
-
-
-
-
-
-
-
-
 
 
    private void RegisterSqlCommand(int sqlCommand,string strCommand)
@@ -786,22 +929,7 @@ public class SqlStament
         m_connStr = connStr;
     }
 
-    //public bool SetParameter<T>(int index, params string[] strParams)
-    //{
-    //    //统计？的个数
-    //    string pattern = @"\?";
-    //    Regex rgx = new Regex(pattern);
-    //    int count = rgx.Matches(m_sqlCommand).Count;
-    //    if (count != strParams.Length)
-    //    {
-    //        return false;
-    //    }
-    //    foreach(string param in strParams)
-    //    {
-    //        m_sqlCommand = rgx.Replace(m_sqlCommand, param, 1);
-    //    }
-    //    return true;    
-    //}
+
 
     public void SetParameter(MySql.Data.MySqlClient.MySqlParameter paras)
     {
@@ -826,14 +954,6 @@ public class SqlStament
     //执行sqlcommand,返回sql执行的结果
     public bool Execute(ref DataTable dataTable, ref string strErrMsg)
     {
-        //检查参数
-        //string pattern = @"\?";
-        //Regex rgx = new Regex(pattern);
-        //int count = rgx.Matches(m_sqlCommand).Count;
-        //if (count != m_sqlParams.Count)
-        //{
-        //    strErrMsg = "parameters error";
-        //}
         try
         {
             dataTable = MySqlHelper.GetDataSet(m_connStr, CommandType.Text, m_sqlCommand, m_sqlParams.ToArray()).Tables[0];
@@ -841,7 +961,6 @@ public class SqlStament
         catch (Exception e)
         {
             strErrMsg = e.ToString();
-            Log.LogError("sql:" + GetCommand() + "execute error" + strErrMsg);
             return false;
         }
         return true;

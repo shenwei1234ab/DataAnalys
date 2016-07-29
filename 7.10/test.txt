@@ -51,3 +51,7 @@ DataRowComparer.Default
  //time = Convert.ToDateTime("2016-07-08 19:29:20"); 
 
 
+    MySql.Data.MySqlClient.MySqlParameter[] array = { 
+        new MySql.Data.MySqlClient.MySqlParameter("?date", gaDateTime),
+        new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)};

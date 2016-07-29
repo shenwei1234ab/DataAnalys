@@ -18,30 +18,30 @@ public class AnalysisSystem
     /// <param name="resultMsg"></param>
     /// <returns>ResultCode为1代表成功，0代表失败；ResultMsg：请求成功则为Success，请求失败则为异常信息内容；</returns>
 
-    public int Post(ref string resultMsg)
+    public int Post()
     {
         string posUrl = m_baseURL + m_actionNameURL;
         string strResult;
+        ////test
         int resultCode = 1;
         try
         {
-            strResult = PostWebRequest(posUrl, m_postData, m_defaultEncode);
+            if(PostWebRequest(posUrl, m_postData, m_defaultEncode, out strResult) == false)
+            {
+                return 0;
+            }
             if( Setting.Debug())
             {
                 return 1;
             }
             JObject obj = JObject.Parse(strResult);
             resultCode = (int)obj["ResultCode"];
-            resultMsg = (string)obj["ResultMsg"];   
+            string resultMsg = (string)obj["ResultMsg"];   
         }
-        catch (WebException ex)
+        catch(Exception ex)
         {
-            HttpWebResponse res = (HttpWebResponse)ex.Response;
-            StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8);
-            resultMsg = sr.ReadToEnd();
-            Log.LogError("Post Failed" + resultMsg);
+            Log.LogError("Post Failed" + ex.ToString());
             resultCode = 0;
-
         }
         return resultCode;
     }
@@ -49,20 +49,20 @@ public class AnalysisSystem
 
 
     #region 内部方法
-    protected string PostWebRequest(string postUrl, string paramData, Encoding dataEncode)
+    protected bool PostWebRequest(string postUrl, string paramData, Encoding dataEncode,out string jsonRet)
     {
-        string ret = string.Empty;
+        //string ret = string.Empty;
         try
         {
             byte[] byteArray = dataEncode.GetBytes(paramData); //传值参数转化byte数组
-        if(Setting.Debug())
-        {
-            Log.LogDebug("postUrl:" + postUrl + "svrid:" + m_svr.m_SvrAreaId + "channel:" + m_channel.Id + "data:" + paramData);
-            return "test";
-
-        }
-            Log.LogDebug("postUrl:" + postUrl + "svrid:" + m_svr.m_SvrAreaId + "channel:" + m_channel.Id + "data:" + paramData);
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(new Uri(postUrl)); //创建HttpWebRequest实例
+            if (Setting.Debug())
+            {
+                Log.LogDebug("post" + paramData);
+                jsonRet = "test";
+                return true;
+            }
+            Log.LogDebug("post:"+ paramData);
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(new Uri(postUrl)); //创
             request.Method = "POST"; //请求方式
             request.ContentType = "application/x-www-form-urlencoded";//设置内容类型
             request.ContentLength = byteArray.Length; //设置请求长度
@@ -71,29 +71,36 @@ public class AnalysisSystem
             newStream.Close();
             //响应流
             HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            //StreamReader sr = new StreamReader(response.GetResponseStream(), 
-            //    dataEncode);
-            //ret = sr.ReadToEnd();
-            //Console.Write(ret);
-            //sr.Close();
-            //response.Close();
-            //newStream.Close();
             Stream s = response.GetResponseStream();
             XmlTextReader Reader = new XmlTextReader(s);
             Reader.MoveToContent();
-            ret = Reader.ReadInnerXml();//取出Content中的Json数据
+            jsonRet = Reader.ReadInnerXml();//取出Content中的Json数据
+            Log.LogDebug("receive:" + jsonRet);
             Reader.Close();
             s.Close();
         }
         catch (WebException ex)
         {
+            HttpWebResponse res = (HttpWebResponse)ex.Response;
+            StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8);
+            string msg = sr.ReadToEnd();
+            Log.LogError("Post Failed got WebException" + msg);
+            Log.LogError("Error Call stack" + ex.StackTrace);
+            jsonRet = "";
+            return false;
+        }
+        catch (Exception ex)
+        {
             //test
             //HttpWebResponse res = (HttpWebResponse)ex.Response;
             //StreamReader sr = new StreamReader(res.GetResponseStream(), Encoding.UTF8);
             //string strHtml = sr.ReadToEnd();
-            throw ex;
+            Log.LogDebug("Post Failed other Exception" + ex.ToString());
+            Log.LogError("Error Call stack" + ex.StackTrace);
+            jsonRet = "";
+            return false;
         }
-        return ret;
+        return true;
     }
 
     /// <summary>
@@ -129,7 +136,7 @@ public class AnalysisSystem
             else
             {
                 var ret = table.Rows[0][resultName];
-                Log.LogDebug("ret type:" + ret.GetType().ToString());
+               // Log.LogDebug("ret type:" + ret.GetType().ToString());
                 result = (T)table.Rows[0][resultName];
             }
         }
@@ -291,6 +298,7 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         m_channel = channel;
         m_svr = svr;
         m_postSvrInfo = m_svr.m_SvrAreaName + ":" + m_channel.ChannelId;
+        m_firstlogPayPercent = 0m;
         return true;
 
     }
@@ -299,14 +307,13 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
     public bool AddGames()
     {
         m_actionNameURL = "addGames";
-        m_postData = "gameName=" + m_gameName + "&gameServerIp=" + m_postSvrInfo +
+        m_postData = "gameName=" + m_gameName + "&gameServerIp=" + m_svr.m_SvrAreaName +
             "&gameServerName=" + m_svr.m_SvrAreaId+
             "&userToken=" + m_userToken +
             "&gameCode=" + m_gameCode;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddGames failed:" + strError);
+            Log.LogError("AddGames failed:");
             return false;
         }
         return true;
@@ -321,10 +328,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
     {
         m_actionNameURL = "addChannels";
         m_postData = "channelName=" + m_channel.Name + "&gameServerIp=" + m_svr.m_SvrAreaName+":"+m_channel.ChannelId+ "&userToken=" + m_userToken;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddGames failed:" + strError);
+            Log.LogError("AddGames failed:" );
             return false;
         }
         return true;
@@ -375,37 +381,58 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         }
         //todo启动设备= 登陆设备
         opStartDeviceNum = opLoginDeviceNum;
-        if (opLoginDeviceNum>0)
-        {
-            int i = 1;
-        }
         //今日登陆账号数
         if (!GetAggregateResult<Int64>(SqlCommand.SELECT_COUNT_LOGINAccount, "count", ref opLoginAccountNum, array))
         {
             return false;
         }
-
         //今日新登账号数
-        if (!GetAggregateResult<System.Int64>(SqlCommand.SELECT_COUNT_NEWAccount, "count", ref opFirstLoginAccountNum, array))
+        DataTable newLogTB = new DataTable();
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_NEWAccount, ref newLogTB, array) < 0)
         {
             return false;
+        }
+        opFirstLoginAccountNum = newLogTB.Rows.Count;
+
+
+        //付费账号数
+        //获取今日付费的所有玩家
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_ACCOUNT, ref tbResult, array) < 0)
+        {
+            return false;
+        }
+        //计算新登账号付费率（今日新登账号里付费的账号）
+        DataTable newLogPayTb = new DataTable();
+        if (newLogTB.Rows.Count > 0 && tbResult.Rows.Count > 0)
+        {
+            //newLogTB 的 openid 转为ppid
+            //netlogtb 添加新的一列(为了与tbResult的ppid比较)
+            DataColumn newCol = new DataColumn("ppid");
+            newLogTB.Columns.Add(newCol);
+            for (int i = 0; i < newLogTB.Rows.Count; ++i)
+            {
+                try
+                {
+                    string openid = newLogTB.Rows[i]["openid"].ToString();
+                    string ppid = Util.OpenIdToPPId(openid);
+                    newLogTB.Rows[i]["ppid"] = ppid;
+                }
+                catch (Exception ex)
+                {
+                    Log.LogError(ex.ToString());
+                }
+            }
+            IEnumerable<DataRow> newLogPay = newLogTB.AsEnumerable().Except(tbResult.AsEnumerable(), DataRowComparer.Default);
+            if (newLogPay.Count() != 0)
+            {
+                newLogPayTb = newLogPay.CopyToDataTable();
+            }
+        }
+        if (newLogPayTb.Rows.Count > 0 && opFirstLoginAccountNum > 0)
+        {
+            opFirstLoginPayPercent = (decimal)newLogPayTb.Rows.Count / opFirstLoginAccountNum;
         }
 
-        //获取付费账号数
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_ACCOUNT);
-        if (st == null)
-        {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
-            return false;
-        }
-        //  DateTime time = DateTime.Now.AddDays(-2);        //昨天时间
-       // DateTime time = DateTime.Now;        //昨天时间
-        st.SetParameter(array);
-        if (!st.Execute(ref tbResult, ref msg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-            return false;
-        }
         //计算
         opPayAccountNum = tbResult.Rows.Count;
         for (int i = 0; i < tbResult.Rows.Count; ++i)
@@ -422,16 +449,8 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         }
         //新付费账号数
         //获取付费的新玩家
-        st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_FIRSTPAY_ACCOUNT);
-        if (st == null)
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_FIRSTPAY_ACCOUNT, ref tbResult, array) < 0)
         {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
-            return false;
-        }
-        st.SetParameter(array);
-        if (!st.Execute(ref tbResult, ref msg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
             return false;
         }
         opFirstPayAccountNum = tbResult.Rows.Count;
@@ -454,16 +473,8 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         {
             try
             {
-                st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_NEWAccount);
-                if (st == null)
+                if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_NEWAccount, ref tbResult, array) < 0)
                 {
-                    Log.LogError("sql:" + st.GetCommand() + "not register");
-                    return false;
-                }
-                st.SetParameter(array);
-                if (!st.Execute(ref tbResult, ref msg))
-                {
-                    Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
                     return false;
                 }
                 //2.获取新登账号的收入
@@ -473,15 +484,15 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
                     //转为ppid
                     string ppid = Util.OpenIdToPPId(vopenid);
                     //查询ppid的今日收入
-                    SqlStament stGetSum = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_ACCOUNT_PAY);
-                    stGetSum.SetParameter(array);
-                    stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?ppid", ppid));
                     DataTable tbSum = new DataTable();
-                    if (!stGetSum.Execute(ref tbSum, ref msg))
+                    if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_ACCOUNT_PAY,ref tbSum,new MySql.Data.MySqlClient.MySqlParameter("?date",gaDateTime) ,
+        new MySql.Data.MySqlClient.MySqlParameter("?Channel",m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("SvrAreaId",m_svr.m_SvrAreaId),
+        new MySql.Data.MySqlClient.MySqlParameter("?ppid", ppid))<0)
                     {
-                        Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
                         return false;
                     }
+
                     // Console.Write(tbSum.Rows[0]["sum"].GetType().ToString());
                     decimal sum = (decimal)tbSum.Rows[0]["sum"];
                     opFirstLoginIncome += sum;
@@ -505,10 +516,10 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         {
             opAccountPayPercent = (decimal)opPayAccountNum / opLoginAccountNum;
         }
-        if (opFirstLoginAccountNum > 0)
-        {
-            opFirstLoginPayPercent = (decimal)opFirstPayAccountNum / opFirstLoginAccountNum;
-        }
+        //if (opFirstLoginAccountNum > 0)
+        //{
+        //    opFirstLoginPayPercent = (decimal)opFirstPayAccountNum / opFirstLoginAccountNum;
+        //}
         //留存率
         //计算留存率
         int[] days = new int[] { -1, -2, -3, -4, -5, -6, -14, -29 };
@@ -559,18 +570,17 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
                     "&opFifteenAccountRetention=" + opFifteenAccountRetention.ToString("#0.00") +
                     "&opThirtyAccountRetention=" + opThirtyAccountRetention.ToString("#0.00");
         ;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddOperationData failed:" + strError);
+            Log.LogError("AddOperationData failed:" );
             return false;
         }
         return true;
     }
 #endregion
 
-
-
+    //todo 新登角色付费率 = 新登账号付费率 = 新登机器付费率
+    private decimal m_firstlogPayPercent = 0;
 #region //账号留存数据 
     public bool AddGamersRetention(DateTime time)
     {
@@ -607,28 +617,53 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         {
             return false;
         }
-
         //今日新登账号数
-        if (!GetAggregateResult<System.Int64>(SqlCommand.SELECT_COUNT_NEWAccount, "count", ref gaFirstLoginAccountNum, array))
+        DataTable newLogTB = new DataTable();
+        if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_NEWAccount,ref newLogTB,array)<0)
         {
             return false;
         }
-
-
+        gaFirstLoginAccountNum = newLogTB.Rows.Count;
         //付费账号数
         //获取今日付费的所有玩家
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_ACCOUNT);
-        if (st == null)
+        if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_ACCOUNT,ref tbResult,array) <0 )
         {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
             return false;
         }
-        st.SetParameter(array);
-        if (!st.Execute(ref tbResult, ref msg))
+
+        //计算新登账号付费率（今日新登账号里付费的账号）
+        DataTable newLogPayTb = new DataTable();
+        if(newLogTB.Rows.Count >0 && tbResult.Rows.Count>0)
         {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-            return false;
+            //newLogTB 的 openid 转为ppid
+           //netlogtb 添加新的一列(为了与tbResult的ppid比较)
+            DataColumn newCol = new DataColumn("ppid");
+            newLogTB.Columns.Add(newCol);
+            for(int i=0;i<newLogTB.Rows.Count;++i)
+            {
+                try{
+                    string openid = newLogTB.Rows[i]["openid"].ToString();
+                    string ppid = Util.OpenIdToPPId(openid);
+                    newLogTB.Rows[i]["ppid"] = ppid;
+                }
+                catch(Exception ex)
+                {
+                    Log.LogError(ex.ToString());
+                }
+            }
+            IEnumerable<DataRow> newLogPay = newLogTB.AsEnumerable().Except(tbResult.AsEnumerable(), DataRowComparer.Default);
+            if (newLogPay.Count() != 0)
+            {
+                newLogPayTb = newLogPay.CopyToDataTable();
+            }
         }
+        if (newLogPayTb.Rows.Count > 0 && gaFirstLoginAccountNum > 0)
+        {
+            gaFirstLoginAccountPayPercent = (decimal) newLogPayTb.Rows.Count / gaFirstLoginAccountNum;
+            m_firstlogPayPercent = gaFirstLoginAccountNum;
+        }
+
+
         Dictionary<int, int> countMap = new Dictionary<int, int>();
         //计算
         gaPayAccountNum = tbResult.Rows.Count;
@@ -645,18 +680,11 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
             }        
         }
         //获取付费的新账号
-        st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_FIRSTPAY_ACCOUNT);
-        if (st == null)
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_FIRSTPAY_ACCOUNT, ref tbResult, array) < 0)
         {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
             return false;
         }
-        st.SetParameter(array);
-        if (!st.Execute(ref tbResult, ref msg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-            return false;
-        }
+
         countMap.Clear();
         gaFirstLoginPayAccountNum = tbResult.Rows.Count;
         for (int i = 0; i < tbResult.Rows.Count; ++i)
@@ -677,10 +705,10 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         }
 
 
-        if (gaFirstLoginAccountNum > 0)
-        {
-            gaFirstLoginAccountPayPercent = (decimal)gaFirstLoginPayAccountNum / gaFirstLoginAccountNum;
-        }
+        //if (gaFirstLoginAccountNum > 0)
+        //{
+        //    gaFirstLoginAccountPayPercent = (decimal)gaFirstLoginPayAccountNum / gaFirstLoginAccountNum;
+        //}
         if (gaFirstLoginPayAccountNum > 0)
         {
             gaFirstLoginAccountPayArpu = (decimal)ga_income / gaFirstLoginPayAccountNum;
@@ -763,10 +791,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
                     "&gaFifteenAccountRetention=" + gaFifteenAccountRetention.ToString("#0.00") +
                     "&gaThirtyAccountRetention=" + gaThirtyAccountRetention.ToString("#0.00");
         ;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddGamersRetention failed:" + strError);
+            Log.LogError("AddGamersRetention failed:");
             return false;
         }
         return true;
@@ -820,41 +847,19 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         {
             return false;
         }
-
-
         //付费角色
         //获取今日付费的所有角色
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_Player);
-        if (st == null)
+        if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_Player, ref tbResult,array )<0)
         {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
+            Log.LogError("SELECT_PAY_Player failed");
             return false;
         }
-        //test
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date1", gaDateTime));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date2", gaDateTime));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId));
-        string msg = "";
-        if (!st.Execute(ref tbResult, ref msg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-            return false;
-        }
-        HashSet<UInt64> playerSet = new HashSet<UInt64>();
         try
         {
             for (int i = 0; i < tbResult.Rows.Count; ++i)
             {
-                UInt32 sum = (UInt32)tbResult.Rows[i]["price"];
-                //付费角色数
-                UInt64 playerId = (UInt64)tbResult.Rows[i]["playerid"];
-                if (!playerSet.Contains(playerId))
-                {
-                    //付费角色数+1；
-                    playerSet.Add(playerId);
-                    gaPayRoleNum++;
-                }
+                decimal sum = (decimal)tbResult.Rows[i]["sum"];
+                gaPayRoleNum++;
                 //总收入
                 ga_income += sum;
             }
@@ -864,18 +869,11 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
             Log.LogError(ex.ToString());
         }
         //获取付费的新角色
-        st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_FIRSTPAY_PLAYER);
-            if (st == null)
-            {
-                Log.LogError("sql:" + st.GetCommand() + "not register");
-                return false;
-            }
-            st.SetParameter(array);
-            if (!st.Execute(ref tbResult, ref msg))
-            {
-                Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-                return false;
-            }
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_FIRSTPAY_PLAYER, ref tbResult,array) < 0)
+        {
+            Log.LogError("SELECT_PAY_Player failed");
+            return false;
+        }
         gaFirstLoginPayRoleNum = tbResult.Rows.Count;
         for (int i = 0; i < tbResult.Rows.Count; ++i)
         {
@@ -899,7 +897,8 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
 
         if (gaFirstLoginRoleNum > 0)
         {
-            gaFirstLoginRolePayPercent = (decimal)gaFirstLoginPayRoleNum / gaFirstLoginRoleNum;
+            //gaFirstLoginRolePayPercent = (decimal)gaFirstLoginPayRoleNum / gaFirstLoginRoleNum;
+            gaFirstLoginRolePayPercent = m_firstlogPayPercent;
         }
         if (gaFirstLoginPayRoleNum > 0)
         {
@@ -982,10 +981,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
                     "&gaFifteenRoleRetention=" + gaFifteenRoleRetention.ToString("#0.00") +
                     "&gaThirtyRoleRetention=" + gaThirtyRoleRetention.ToString("#0.00");
         ;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddGamersRetention failed:" + strError);
+            Log.LogError("AddGamersRetention failed:");
             return false;
         }
         return true;
@@ -1092,11 +1090,11 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         }
         if (gaLoginEquipNum > 0)
         {
-            gaEquipPayPercent = (decimal)gaPayEquipNum / gaLoginEquipNum;
+            gaEquipPayPercent = gaPayEquipNum / gaLoginEquipNum;
         }
         if (gaFirstLoginEquipNum > 0)
         {
-            gaFirstLoginEquipPayPercent = (decimal)gaFirstLoginPayEquipNum / gaFirstLoginEquipNum;
+            gaFirstLoginEquipPayPercent = m_firstlogPayPercent;
         }
         if (gaFirstLoginPayEquipNum > 0)
         {
@@ -1180,10 +1178,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
                     "&gaFifteenEquipRetention=" + gaFifteenEquipRetention.ToString("#0.00") +
                     "&gaThirtyEquipRetention=" + gaThirtyEquipRetention.ToString("#0.00");
         ;
-        string strError = "";
-        if (Post(ref strError) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddGamersRetention failed:" + strError);
+            Log.LogError("AddGamersRetention failed:");
             return false;
         }
         return true;
@@ -1292,7 +1289,6 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
             dataArray[i].totalIncome = totalIncome;
         }
         bool ret = true;
-        string strMsg = "";
         m_postData = "coDateTime=" + time.ToString() +
         "&gameServerIp=" + m_postSvrInfo+
         "&userToken=" + m_userToken +
@@ -1306,9 +1302,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         "&coSevenDayIncome=" + dataArray[1].totalIncome.ToString("#0.00") +
         "&coFifteenDayIncome=" + dataArray[2].totalIncome.ToString("#0.00") +
         "&coThirtyDayIncome=" + dataArray[3].totalIncome.ToString("#0.00");
-        if (Post(ref strMsg) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddCommonLtvWorth failed:" + strMsg);
+            Log.LogError("AddCommonLtvWorth failed:" );
             ret = false;
         }
         return ret;
@@ -1421,9 +1417,9 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
         "&gaAddSevenDaySumIncome=" + dataArray[1].SumIncome.ToString("#0.00") +
         "&gaAddFifteenDaySumIncome=" + dataArray[2].SumIncome.ToString("#0.00") +
         "&gaAddThirtyDaySumIncome=" + dataArray[3].SumIncome.ToString("#0.00");
-        if (Post(ref strMsg) == 0)
+        if (Post() == 0)
         {
-            Log.LogError("AddCommonLtvWorth failed:" + strMsg);
+            Log.LogError("AddCommonLtvWorth failed:" );
             ret = false;
         }
         return ret;
@@ -1434,128 +1430,111 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
 
 #region 3.2.9	添加玩家个人充值数据
     //角色个人充值
-    public bool AddUserRecharges(DateTime date,DateTime lastTime)
-    {
-        m_actionNameURL = "addUserRecharges";
-        string strMsg = "";
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_AddUserRecharges);
-        DataTable resultTb = new DataTable();
-        if (st == null)
-        {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
-            return false;
-        }
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?lastdate",lastTime.ToString()));
-        if (!st.Execute(ref resultTb, ref strMsg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + strMsg);
-            return false;
-        }
-        bool ret = true;
-        //查询数据库订单状态
-        //2: 支付成功PaySuccess，通知成功NotifySuccess
-        //0： （date-dtEventTime < 1）下单成功CreateSuccess
-        //0:  (date - dtEventTime > 1)支付失败PayFailed
-        List<Order> orderList = new List<Order>();
+    //public bool AddUserRecharges(DateTime date,DateTime lastTime)
+    //{
+//        m_actionNameURL = "addUserRecharges";
+//        DataTable resultTb = new DataTable();
+//      if( SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_AddUserRecharges,ref resultTb,new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()),
+//           new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id), new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId),new MySql.Data.MySqlClient.MySqlParameter("?lastdate",lastTime.ToString()))<0)
+//      {
+//          return false;
+//      }
 
-      
-        for (int i = 0; i < resultTb.Rows.Count; ++i)
-        {
-            try
-            {
-                string orderid = resultTb.Rows[i]["orderid"].ToString();
-                string ppid = (string)resultTb.Rows[i]["ppid"].ToString();
-                string nickname = resultTb.Rows[i]["nickname"].ToString();
-                string playerid = (string)resultTb.Rows[i]["playerid"].ToString();
-                string accountCreateTime = resultTb.Rows[i]["accountCreateTime"].ToString();
-                DateTime orderCreateTime = (DateTime)resultTb.Rows[i]["orderCreateTime"];
-                string orderMoney = resultTb.Rows[i]["price"].ToString();
-               // string rechargeMoney = resultTb.Rows[i]["price"].ToString();
-                string status = resultTb.Rows[i]["status"].ToString();  
+//        bool ret = true;
+//        //查询数据库订单状态
+//        //2: 支付成功PaySuccess，通知成功NotifySuccess
+//        //0： （date-dtEventTime < 1）下单成功CreateSuccess
+//        //0:  (date - dtEventTime > 1)支付失败PayFailed
+//        List<Order> orderList = new List<Order>();
+
+//        for (int i = 0; i < resultTb.Rows.Count; ++i)
+//        {
+//            try
+//            {
+//                string orderid = resultTb.Rows[i]["orderid"].ToString();
+//                string ppid = (string)resultTb.Rows[i]["ppid"].ToString();
+//                string nickname = resultTb.Rows[i]["nickname"].ToString();
+//                string playerid = (string)resultTb.Rows[i]["playerid"].ToString();
+//                string accountCreateTime = resultTb.Rows[i]["accountCreateTime"].ToString();
+//                DateTime orderCreateTime = (DateTime)resultTb.Rows[i]["orderCreateTime"];
+//                string orderMoney = resultTb.Rows[i]["price"].ToString();
+//                string status = resultTb.Rows[i]["status"].ToString();  
              
                
-                //查询渠道订单号
-                string channelOrderNo = "";
-                int result = SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_AddUserRecharges_ChannelOrderNo, "pforderid", ref channelOrderNo, new MySql.Data.MySqlClient.MySqlParameter("?orderid", orderid));
-               if(result<0)
-               {
-                   return false;
-               }
-               Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
-                if (status == "2")
-                {
-                    order.m_orderState = OrderState.NotifySuccess;
-                    order.m_rechargeState = rechargetState.Payed;
-                    Order order2 = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
-                    order2.m_orderState = OrderState.PaySuccess;
-                    order2.m_rechargeState = rechargetState.Payed;
-                    orderList.Add(order2);
-                }
-                else if (status == "0")
-                {
-                    TimeSpan span = (TimeSpan)(date - orderCreateTime);
-                    //todo
-                    if (span.Minutes < 1)
-                   {
-                         order.m_orderState = OrderState.CreateSuccess;
-                   }
-                    else
-                    {
-                        order.m_orderState = OrderState.PayFailed;
-                    }
-                    order.m_rechargeState = rechargetState.NoPayed;
-                }
-                else
-                {
-                    order.m_orderState = OrderState.Other;
-                }
-                orderList.Add(order);
-            }
-            catch(Exception ex)
-            {
-                Log.LogError(ex.ToString());
-                continue;
-            }
-        }
-        //if(orderList.Count == 0)
-        //{
-        //    Order order = new Order("0", "0", "0", "#0.00", date);
-        //    order.m_orderState = OrderState.NoData;
-        //    orderList.Add(order);
-        //}
-        foreach (var order in orderList)
-        {
-            m_postData =
-      "gameOrderNo=" + order.m_orderid.ToString() +
-       "&channelOrderNo=" + order.m_channelOrderNo.ToString() +
-     "&gameServerIp=" + m_postSvrInfo +
- "&userToken=" + m_userToken +
-  "&gamerAccount=" + order.m_ppid +
-  "&roleName=" + order.m_userNickname +
-  "&roleId=" + order.m_playerid +
-  "&mainChannelName=" + "棱镜" +
-"&equipId=" + "" +
-"&platform=" + m_platform+
-"&gamerServerName=" + m_svr.m_SvrAreaId +
-"&accountCreateTime=" + order.m_accountCreateTime +
-"&gamerPhone=" + "" +
-"&orderCreateTime=" + order.m_orderCreateTime +
-"&orderMoney=" + order.m_money +
-"&rechargeMoney=" + order.m_money +
-"&rechargeFunc=" + "" +
- "&rechargetState=" + (int)order.m_rechargeState +
- "&orderState=" +(int) order.m_orderState;
-            if (Post(ref strMsg) == 0)
-            {
-                Log.LogError("AddUserRecharges failed:" + strMsg);
-                ret = false;
-            }
-        }
-        return ret;
-    }
+//                //查询渠道订单号
+//                string channelOrderNo = "";
+//                int result = SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_AddUserRecharges_ChannelOrderNo, "pforderid", ref channelOrderNo, new MySql.Data.MySqlClient.MySqlParameter("?orderid", orderid));
+//               if(result<0)
+//               {
+//                   return false;
+//               }
+//               Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
+//                if (status == "2")
+//                {
+//                    order.m_orderState = OrderState.NotifySuccess;
+//                    order.m_rechargeState = rechargetState.Payed;
+//                    Order order2 = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
+//                    order2.m_orderState = OrderState.PaySuccess;
+//                    order2.m_rechargeState = rechargetState.Payed;
+//                    orderList.Add(order2);
+//                }
+//                else if (status == "0")
+//                {
+//                    TimeSpan span = (TimeSpan)(date - orderCreateTime);
+//                    //todo
+//                    if (span.Minutes < 1)
+//                   {
+//                         order.m_orderState = OrderState.CreateSuccess;
+//                   }
+//                    else
+//                    {
+//                        order.m_orderState = OrderState.PayFailed;
+//                    }
+//                    order.m_rechargeState = rechargetState.NoPayed;
+//                }
+//                else
+//                {
+//                    order.m_orderState = OrderState.Other;
+//                }
+//                orderList.Add(order);
+//            }
+//            catch(Exception ex)
+//            {
+//                Log.LogError(ex.ToString());
+//                continue;
+//            }
+//        }
+//        foreach (var order in orderList)
+//        {
+//            m_postData =
+//      "gameOrderNo=" + order.m_orderid.ToString() +
+//       "&channelOrderNo=" + order.m_channelOrderNo.ToString() +
+//     "&gameServerIp=" + m_postSvrInfo +
+// "&userToken=" + m_userToken +
+//  "&gamerAccount=" + order.m_ppid +
+//  "&roleName=" + order.m_userNickname +
+//  "&roleId=" + order.m_playerid +
+//  "&mainChannelName=" + "棱镜" +
+//"&equipId=" + "" +
+//"&platform=" + m_platform+
+//"&gamerServerName=" + m_svr.m_SvrAreaId +
+//"&accountCreateTime=" + order.m_accountCreateTime +
+//"&gamerPhone=" + "" +
+//"&orderCreateTime=" + order.m_orderCreateTime +
+//"&orderMoney=" + order.m_money +
+//"&rechargeMoney=" + order.m_money +
+//"&rechargeFunc=" + "" +
+// "&rechargetState=" + (int)order.m_rechargeState +
+// "&orderState=" +(int) order.m_orderState;
+//            string strMsg = "";
+//            if (Post(ref strMsg) == 0)
+//            {
+//                Log.LogError("AddUserRecharges failed:" + strMsg);
+//                ret = false;
+//            }
+//        }
+//        return ret;
+    //}
 
 #endregion
 
@@ -1568,12 +1547,11 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId)};
             {
                 string jsonBatch = new JavaScriptSerializer().Serialize(infoList);
                 //批量添加等级流失数据
-                string msg = "";
                 m_postData = "userToken=" + m_userToken +
                                "&jsonBatch=" + jsonBatch;
-                if (Post(ref msg) == 0)
+                if (Post() == 0)
                 {
-                    Log.LogError("PostBatch "+infoList.GetType().ToString()+ "failed:" + msg);
+                    Log.LogError("PostBatch "+infoList.GetType().ToString()+ "failed:" );
                     return false;
                 }
             }
@@ -2072,7 +2050,16 @@ public class CornCost
             }
             else
             {
-                string coCostCategoryName = m_diamondPayMap[itemType].desc;
+                 string coCostCategoryName="";
+                if (!m_diamondPayMap.ContainsKey(itemType))
+                {
+                    Log.LogError("diamondPayMap not contains" + itemType);
+                }
+                else
+                {
+                    coCostCategoryName = m_diamondPayMap[itemType].desc;
+                }
+                
                 int coCostNumber = pay.Value;
                 VirtualCornCostInfo virCost = new VirtualCornCostInfo();
                 virCost.coDateTime = time.ToString();
@@ -2093,7 +2080,15 @@ public class CornCost
             }
             else
             {
-                string coCostCategoryName = m_diamondPresentMap[eventID].desc;
+                string coCostCategoryName = "";
+                if (!m_diamondPresentMap.ContainsKey(eventID))
+                {
+                    Log.LogError("diamondPresentMap not contains" + eventID);
+                }
+                else
+                {
+                     coCostCategoryName = m_diamondPresentMap[eventID].desc;
+                }
                 int coCostNumber = present.Value;
                 VirtualCornCostInfo virCost = new VirtualCornCostInfo();
                 virCost.coDateTime = time.ToString();
@@ -2113,124 +2108,113 @@ public class CornCost
     {
         //test delete
         m_actionNameURL = "addRechargeGamerInfoBatch";
-        string inEquip = ""; 
-        //获取今日付费的所有玩家
-        DataTable tbResult = new DataTable();
-        //SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_Player);
-        //if (st == null)
-        //{
-        //    Log.LogError("sql:" + st.GetCommand() + "not register");
-        //    return false;
-        //}
-        //st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date1", time));
-        //st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date2", time));
-        //st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id));
-        //st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",m_svr.m_SvrAreaId));
-        //if (!st.Execute(ref tbResult, ref msg))
-        //{
-        //    Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-        //    return false;
-        //}
 
-        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_Player, ref tbResult, new MySql.Data.MySqlClient.MySqlParameter("?date1", time), new MySql.Data.MySqlClient.MySqlParameter("?date2", time),
-           new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
-           new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
+        string inEquip = ""; 
+        //获取今日付费所有玩家
+        DataTable tbResult = new DataTable();
+        MySql.Data.MySqlClient.MySqlParameter[] array = { 
+        new MySql.Data.MySqlClient.MySqlParameter("?date", time),
+        new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)};
+
+        //今日付费所有玩家
+        List<string> payList = new List<string>();
+        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_Player, ref tbResult,array) < 0)
         {
             return false;
         }
-        List<BigRechargeGamerInfo> infoList = new List<BigRechargeGamerInfo>();
         for (int i = 0; i < tbResult.Rows.Count; ++i)
         {
             DataRow dataRow = tbResult.Rows[i];
             try
             {
-                UInt64 ppid = (UInt64)dataRow["ppid"];
-                string inRoleName = (string)dataRow["nickname"];
-                var playerid = dataRow["playerid"];
-                DateTime timestamp = (DateTime)dataRow["timestamp"];
-                string inRechargeMoney = "";
-                //获得所有的充值金额
-                if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RechargeGamerInfo, "sum",
-                    ref inRechargeMoney,
-                    new MySql.Data.MySqlClient.MySqlParameter("?date", time),
-                    new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
-                    new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId),
-                    new MySql.Data.MySqlClient.MySqlParameter("?playerid", playerid))<0)
+                if (dataRow["sum"] != null && dataRow["playerid"] != null)
                 {
-                    return false;
+                    payList.Add(dataRow["playerid"].ToString());
                 }
-                UInt32 SvrAreaId = (UInt32)dataRow["zoneid"];
-                //当日钻石拥有数量
-                UInt32 inVirtualCornOwnNumber = (UInt32)dataRow["diamond"];
-                string inRechargeLevel = "1";
-                //获得openid
-                string openid = Util.PPIdToOpenId((Int64)ppid);
-                DataTable tbGamer = new DataTable();
-                //最后一次的登录device
-                if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_DEVICEID, "SystemHardware",
-                ref inEquip,
-                new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
-                new MySql.Data.MySqlClient.MySqlParameter("?date", time),
-                new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
-                new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
-                {
-                    return false;
-                }
-
-                //最后一次升级的等级
-                if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_LEVEL, "AfterLevel",
-               ref inRechargeLevel,
-               new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
-               new MySql.Data.MySqlClient.MySqlParameter("?date", time),
-               new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
-                {
-                    return false;
-                }
-                //钻石消耗数量
-                string inVirtualCornSumCost = "0";
-                if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_DIAMOND_CONSUMCOST, "sum",
-             ref inVirtualCornSumCost,
-             new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
-             new MySql.Data.MySqlClient.MySqlParameter("?date", time),
-             new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
-                {
-                    return false;
-                }
-                BigRechargeGamerInfo info = new BigRechargeGamerInfo();
-                info.caculateDateTime = time.ToString();
-                info.inRoleName = inRoleName;
-                info.gameServerIp = m_postSvrInfo;
-                info.inRoleId = playerid.ToString();
-                info.inEquip = inEquip;
-                info.inRechargeMoney = (Convert.ToDecimal(inRechargeMoney)).ToString("#0.00");
-                info.inRechargeLevel = inRechargeLevel.ToString();
-                info.inDateTime = timestamp.ToString();
-                info.inVirtualCornOwnNumber = inVirtualCornOwnNumber;
-                info.inVirtualCornSumCost = inVirtualCornSumCost;
-                infoList.Add(info);
-               
-                //m_postData = 
-                //    "caculateDateTime="+time+
-                //    "&inRoleName=" + inRoleName +
-                //"&gameServerIp=" + m_postSvrInfo+
-                //"&userToken=" + m_userToken +
-                //"&inRoleId=" + playerid +
-                //"&inEquip=" + inEquip +
-                //"&inRechargeMoney=" + (Convert.ToDecimal(inRechargeMoney)).ToString("#0.00") +
-                //"&inRechargeLevel=" + inRechargeLevel +
-                //"&inDateTime=" + timestamp.ToString() +
-                //"&inVirtualCornOwnNumber=" + inVirtualCornOwnNumber +
-                //"&inVirtualCornSumCost=" + inVirtualCornSumCost;
             }
-            catch (Exception ex)
+            catch(Exception ex)
             {
                 Log.LogError(ex.ToString());
             }
-            //if (Post(ref msg) == 0)
-            //{
-            //    Log.LogError("AddRechargeGamerInfo failed:" + msg);
-            //    ret = false;
-            //}
+            continue;
+        }
+        List<BigRechargeGamerInfo> infoList = new List<BigRechargeGamerInfo>();
+        foreach (var playerid in payList)
+        {
+            if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RechargeGamerInfo, ref tbResult,
+                new MySql.Data.MySqlClient.MySqlParameter("?date", time),
+               new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
+               new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId),
+                 new MySql.Data.MySqlClient.MySqlParameter("?playerid", playerid)) < 0)
+            {
+                return false;
+            }
+            for (int i = 0; i < tbResult.Rows.Count; ++i)
+            {
+                DataRow dataRow = tbResult.Rows[i];
+                try
+                {
+                    UInt64 ppid = (UInt64)dataRow["ppid"];
+                    string inRoleName = (string)dataRow["nickname"];
+                    //var playerid = dataRow["playerid"];
+                    DateTime timestamp = (DateTime)dataRow["timestamp"];
+                    string inRechargeMoney = dataRow["sum"].ToString();
+                    //UInt32 SvrAreaId = (UInt32)dataRow["zoneid"];
+                    //当日钻石拥有数量
+                    UInt32 inVirtualCornOwnNumber = (UInt32)dataRow["diamond"];
+                    string inRechargeLevel = "1";
+                    //获得openid
+                    string openid = Util.PPIdToOpenId((Int64)ppid);
+                    DataTable tbGamer = new DataTable();
+                    //最后一次的登录device
+                    if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_DEVICEID, "SystemHardware",
+                    ref inEquip,
+                    new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
+                    new MySql.Data.MySqlClient.MySqlParameter("?date", timestamp),
+                    new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
+                    new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
+                    {
+                        return false;
+                    }
+
+                    //最后一次升级的等级
+                    if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_LEVEL, "AfterLevel",
+                   ref inRechargeLevel,
+                   new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
+                   new MySql.Data.MySqlClient.MySqlParameter("?date", timestamp),
+                   new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
+                    {
+                        return false;
+                    }
+                    //钻石消耗数量
+                    string inVirtualCornSumCost = "0";
+                    if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_RECHARGEPLAYER_DIAMOND_CONSUMCOST, "sum",
+                 ref inVirtualCornSumCost,
+                 new MySql.Data.MySqlClient.MySqlParameter("?openid", openid),
+                 new MySql.Data.MySqlClient.MySqlParameter("?date", timestamp),
+                 new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)) < 0)
+                    {
+                        return false;
+                    }
+                    BigRechargeGamerInfo info = new BigRechargeGamerInfo();
+                    info.caculateDateTime = time.ToString();
+                    info.inRoleName = inRoleName;
+                    info.gameServerIp = m_postSvrInfo;
+                    info.inRoleId = playerid.ToString();
+                    info.inEquip = inEquip;
+                    info.inRechargeMoney = (Convert.ToDecimal(inRechargeMoney)).ToString("#0.00");
+                    info.inRechargeLevel = inRechargeLevel.ToString();
+                    info.inDateTime = timestamp.ToString();
+                    info.inVirtualCornOwnNumber = inVirtualCornOwnNumber;
+                    info.inVirtualCornSumCost = inVirtualCornSumCost;
+                    infoList.Add(info);
+                }
+                catch (Exception ex)
+                {
+                    Log.LogError(ex.ToString());
+                }
+            }
         }
         return PostBatch<BigRechargeGamerInfo>(infoList);
     }

@@ -70,59 +70,93 @@ class Util
     //计算今日pcu时段
     public static string CalPCUTimeVal(DateTime date, string Channel, uint SvrAreaId)
     {
-        string msg="";
         string ret = "0-0";
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_ALL_ONLINECNT);
-        if (st == null)
-        {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
-            return ret;
-        }
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", Channel.ToString()));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", SvrAreaId.ToString()));
+        MySql.Data.MySqlClient.MySqlParameter[] array = { 
+        new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()),
+        new MySql.Data.MySqlClient.MySqlParameter("?Channel",Channel.ToString()),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", SvrAreaId.ToString())};
         DataTable tbResult = new DataTable();
-        if (!st.Execute(ref tbResult, ref msg))
+        if(SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_ALL_ONLINECNT,ref tbResult,array)<0)
         {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
+            Log.LogError("SELECT_ALL_ONLINECNT error");
             return ret;
         }
-        try
-        {
             if (tbResult.Rows.Count <=0)
             {
                 return ret;
             }
-            DateTime dtMin = (DateTime)tbResult.Rows[0]["dtEventTime"];
-            PcuTimeval tmpPCU = new PcuTimeval(dtMin,0);
-            List<PcuTimeval> pcuList = new List<PcuTimeval>();
-            for (int i = 0; i < tbResult.Rows.Count; ++i)
+
+         Dictionary<int, UInt32> onlineMap = new Dictionary<int, UInt32>();
+           // DateTime dtMin = (DateTime)tbResult.Rows[0]["dtEventTime"];
+            //PcuTimeval tmpPCU = new PcuTimeval(dtMin,0);
+           // List<PcuTimeval> pcuList = new List<PcuTimeval>();
+           // pcuList.Add(tmpPCU);
+        for (int i = 0; i < tbResult.Rows.Count; ++i)
+        {
+            try
             {
                 DateTime datetime = (DateTime)tbResult.Rows[i]["dtEventTime"];
+                int hour = datetime.Hour;
                 UInt32 onlineNum = (UInt32)tbResult.Rows[i]["OnlineCnt"];
-                if(datetime > dtMin.AddHours(1))
-                {
-                    dtMin = datetime;
-                    tmpPCU = new PcuTimeval(dtMin, onlineNum);
-                    pcuList.Add(tmpPCU);
-                }
-                else
-                {
-                    tmpPCU.m_num += onlineNum;
-                }
+                if (onlineMap.ContainsKey(hour))
+                 {
+                     onlineMap[hour] += onlineNum;
+                 }
+                 else
+                 {
+                     onlineMap[hour] = onlineNum;
+                 }
             }
-            //排序
-            pcuList.Sort();
-            //输出最大的时间
-            int hour = pcuList[0].m_pcuTime.Hour;
-            int  nexthour = pcuList[0].m_pcuTime.AddHours(1).Hour;
-            ret = hour.ToString() + "点-" + nexthour.ToString() + "点";
+            catch(Exception ex)
+            {
+                Log.LogError(ex.ToString());
+                continue;
+            }
+           
+             
+            //if(datetime > dtMin.AddHours(1))
+            //{
+            //    dtMin = datetime;
+            //    tmpPCU = new PcuTimeval(dtMin, onlineNum);
+            //    pcuList.Add(tmpPCU);
+            //}
+            //else
+            //{
+            //    tmpPCU.m_num += onlineNum;
+            //}
+        }
+        //if(pcuList.Count>0)
+        //{
+        //    //排序
+        //    pcuList.Sort();
+        //    //输出最大的时间
+        //    int hour = pcuList[pcuList.Count-1].m_pcuTime.Hour;
+        //    int nexthour = pcuList[pcuList.Count - 1].m_pcuTime.AddHours(1).Hour;
+        //    ret = hour.ToString() + "点-" + nexthour.ToString() + "点";
+        //}
+        try{
+            if (onlineMap.Count > 0)
+            {
+                var result = from pair in onlineMap orderby pair.Value descending select pair;
+            foreach(var  pair in result)
+            {
+                int maxHour = pair.Key;
+                int nextHour = maxHour + 1;
+                if (maxHour == 24)
+                {
+                    nextHour = 0;
+                }
+                ret = maxHour.ToString()+"点-"+nextHour.ToString()+"点";
+                break;
+            }
+            }
         }
         catch(Exception ex)
         {
             Log.LogError(ex.ToString());
-            return ret;
+          
         }
+       
         return ret;
     }
 

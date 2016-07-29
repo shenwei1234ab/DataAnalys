@@ -7,40 +7,23 @@ using System.Data;
 
 public class AddUserRechargesTask:Task
 {
+    public void RunTask(DateTime nowTime, DateTime lastTime)
+    {
+        Log.SetFileName("AddUserRecharges");
+        Log.LogDebug("AddUserRecharges Start");
+        foreach (var TaskData in m_taskData)
+        {
+            AddUserRecharges(nowTime, lastTime, TaskData);
+        }
 
+        Log.LogDebug("AddUserRecharges End");
+    }
+ 
 
-    //读取渠道区，列表
-  
-
-    //public  void RunTask(DateTime nowTime, DateTime lastTime)
-    //{
-    //    Log.SetFileName("AddUserRecharges");
-    //    Log.LogDebug("AddUserRecharges Start");
-    //    AnalysisSystem system = new AnalysisSystem();
-    //    foreach (var svr in m_svrList)
-    //    {
-    //        //遍历渠道
-    //        foreach (var channl in m_chanList)
-    //        {
-    //            system.Init(channl, svr);
-    //            //创建订单容器
-    //            if (!system.AddUserRecharges(nowTime, lastTime))
-    //            {
-    //                Log.LogError("AddUserRecharges failed");
-    //                continue;
-    //            }
-    //        }
-    //    }
-    //    Log.LogDebug("AddUserRecharges End");
-    //}
-
-
-
-
-    public bool AddUserRecharges(DateTime date, DateTime lastTime)
+    private bool AddUserRecharges(DateTime date, DateTime lastTime,TaskData data)
     {
         m_actionNameURL = "addUserRecharges";
-        string strMsg = "";
+       string strMsg = "";
         SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_AddUserRecharges);
         DataTable resultTb = new DataTable();
         if (st == null)
@@ -49,8 +32,8 @@ public class AddUserRechargesTask:Task
             return false;
         }
         st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId));
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId));
         st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?lastdate", lastTime.ToString()));
         if (!st.Execute(ref resultTb, ref strMsg))
         {
@@ -63,57 +46,90 @@ public class AddUserRechargesTask:Task
         //0： （date-dtEventTime < 1）下单成功CreateSuccess
         //0:  (date - dtEventTime > 1)支付失败PayFailed
         List<Order> orderList = new List<Order>();
+
+        //下单成功的(status=0)订单,下个一分钟要处理
+        Dictionary<string, Order> newOrderMap = new Dictionary<string,Order>();
+        //处理当前一分钟的订单
         for (int i = 0; i < resultTb.Rows.Count; ++i)
         {
             try
             {
                 string orderid = resultTb.Rows[i]["orderid"].ToString();
-                string ppid = (string)resultTb.Rows[i]["ppid"].ToString();
+                string ppid = resultTb.Rows[i]["ppid"].ToString();
                 string nickname = resultTb.Rows[i]["nickname"].ToString();
-                string playerid = (string)resultTb.Rows[i]["playerid"].ToString();
+                string playerid = resultTb.Rows[i]["playerid"].ToString();
                 string accountCreateTime = resultTb.Rows[i]["accountCreateTime"].ToString();
                 DateTime orderCreateTime = (DateTime)resultTb.Rows[i]["orderCreateTime"];
                 string orderMoney = resultTb.Rows[i]["price"].ToString();
                 // string rechargeMoney = resultTb.Rows[i]["price"].ToString();
                 string status = resultTb.Rows[i]["status"].ToString();
-
-
                 //查询渠道订单号
                 string channelOrderNo = "";
-                int result = SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_AddUserRecharges_ChannelOrderNo, "pforderid", ref channelOrderNo, new MySql.Data.MySqlClient.MySqlParameter("?orderid", orderid));
-                if (result < 0)
+                if(resultTb.Rows[i]["pforderid"]!=null)
                 {
-                    return false;
+                    channelOrderNo = resultTb.Rows[i]["pforderid"].ToString();
                 }
-                Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
+                //      
+                string mainChannelNamel = "";
+                if (resultTb.Rows[i]["platformid"] != null )
+                {
+                   if(resultTb.Rows[i]["platformid"].ToString() == "42")
+                   {
+                       mainChannelNamel = "棱镜";
+                   }
+                }
+                //查询上一分钟的下单成功的订单
+                if (data.m_orderDatas.ContainsKey(orderid))
+                {
+                    if(status == "2")
+                    {
+                        //移除
+                        data.m_orderDatas.Remove(orderid);
+                    }
+                }
+          
                 if (status == "2")
                 {
+                    Order successOrder = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo, mainChannelNamel);
+                    successOrder.m_orderState = OrderState.PaySuccess;
+                    successOrder.m_rechargeState = rechargetState.Payed;
+                    orderList.Add(successOrder);
+
+                    Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo, mainChannelNamel);
                     order.m_orderState = OrderState.NotifySuccess;
                     order.m_rechargeState = rechargetState.Payed;
-                    Order order2 = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo);
-                    order2.m_orderState = OrderState.PaySuccess;
-                    order2.m_rechargeState = rechargetState.Payed;
-                    orderList.Add(order2);
+                    orderList.Add(order);
                 }
                 else if (status == "0")
                 {
-                    TimeSpan span = (TimeSpan)(date - orderCreateTime);
-                    //todo
-                    if (span.Minutes < 1)
-                    {
-                        order.m_orderState = OrderState.CreateSuccess;
-                    }
-                    else
-                    {
-                        order.m_orderState = OrderState.PayFailed;
-                    }
+                    //TimeSpan span = (TimeSpan)(date - orderCreateTime);
+                    ////todo
+                    //if (span.Minutes < 1)
+                    //{
+                    //    order.m_orderState = OrderState.CreateSuccess;
+                    //}
+                    //else
+                    //{
+                    //    order.m_orderState = OrderState.PayFailed;
+                    //}
+                    //order.m_rechargeState = rechargetState.NoPayed;
+                    
+                    Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo, mainChannelNamel);
+                    order.m_orderState = OrderState.CreateSuccess;
                     order.m_rechargeState = rechargetState.NoPayed;
+                    orderList.Add(order);
+                    if (newOrderMap.ContainsKey(orderid))
+                    {
+                        Log.LogError("duplicat orderid"+orderid);
+                        continue;
+                    }
+                    newOrderMap.Add(orderid,order);
                 }
                 else
                 {
-                    order.m_orderState = OrderState.Other;
+                    Log.LogError("UNknown orderid:" + orderid + "orderstatus:" + status);
+                       continue;
                 }
-                orderList.Add(order);
             }
             catch (Exception ex)
             {
@@ -121,20 +137,32 @@ public class AddUserRechargesTask:Task
                 continue;
             }
         }
+
+
+        //处理上一分钟状态为0的订单本分钟还没有完成判定为支付失败PayFailed
+        foreach (var iter in data.m_orderDatas)
+        {
+            Order failOrder = iter.Value;
+            failOrder.m_orderState= OrderState.PayFailed;
+            orderList.Add(failOrder);
+        }
+        data.m_orderDatas = newOrderMap;
+        
+        //提交订单
         foreach (var order in orderList)
         {
             m_postData =
       "gameOrderNo=" + order.m_orderid.ToString() +
        "&channelOrderNo=" + order.m_channelOrderNo.ToString() +
-     "&gameServerIp=" + m_postSvrInfo +
+     "&gameServerIp=" + data.m_postSvrInfo +
  "&userToken=" + m_userToken +
   "&gamerAccount=" + order.m_ppid +
   "&roleName=" + order.m_userNickname +
   "&roleId=" + order.m_playerid +
-  "&mainChannelName=" + "棱镜" +
+  "&mainChannelName=" + order.m_mainChannelName +
 "&equipId=" + "" +
 "&platform=" + m_platform +
-"&gamerServerName=" + m_svr.m_SvrAreaId +
+"&gamerServerName=" + data.m_svr.m_SvrAreaId +
 "&accountCreateTime=" + order.m_accountCreateTime +
 "&gamerPhone=" + "" +
 "&orderCreateTime=" + order.m_orderCreateTime +
@@ -143,7 +171,7 @@ public class AddUserRechargesTask:Task
 "&rechargeFunc=" + "" +
  "&rechargetState=" + (int)order.m_rechargeState +
  "&orderState=" + (int)order.m_orderState;
-            if (Post(ref strMsg) == 0)
+            if (Post(data,ref strMsg) == 0)
             {
                 Log.LogError("AddUserRecharges failed:" + strMsg);
                 ret = false;
