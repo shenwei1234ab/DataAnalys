@@ -56,25 +56,3 @@ public class AccountDataRowComparer : IEqualityComparer<DataRow>
     }
 }
 
-//自定义device的集合运算
-public class DeviceDataRowComparer : IEqualityComparer<DataRow>
-{
-
-    public bool Equals(DataRow x, DataRow y)
-    {
-        // return (x.Field<int>("openid") == y.Field<int>("openid"));  
-        string ldeviceid = x.Field<string>("deviceid");
-        string rdeviceid = y.Field<string>("deviceid");
-        bool ret = false;
-        if (ldeviceid == rdeviceid)
-        {
-            ret = true;
-        }
-        return ret;
-    }
-    public int GetHashCode(DataRow obj)
-    {
-        int ret = obj.ToString().GetHashCode();
-        return ret;
-    }
-}

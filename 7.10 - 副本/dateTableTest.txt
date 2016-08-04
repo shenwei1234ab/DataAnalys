@@ -1,0 +1,195 @@
+using System;
+using System.Collections.Generic;
+using System.Data;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace sqlTest
+{
+    class Program
+    {
+
+          static DataTable dt = new DataTable();
+
+         public class MyDataRowComparer: IEqualityComparer<DataRow>
+        {
+            
+                 public bool Equals(DataRow x, DataRow y)  
+                {   
+                   // return (x.Field<int>("openid") == y.Field<int>("openid"));  
+                    int lopenid = x.Field<int>("openid");
+                    int ropenid = y.Field<int>("openid");
+                    int ldeviceid = x.Field<int>("deviceid");
+                    int rdeviceid = y.Field<int>("deviceid");
+                    bool ret = false;
+                     if (x.Field<int>("openid") == y.Field<int>("openid") && x.Field<int>("deviceid") == y.Field<int>("deviceid"))
+                    {
+                        ret = true;
+                    }
+                    return ret; 
+                 }  
+                public int GetHashCode(DataRow obj)  
+                {  
+                    int ret =  obj.ToString().GetHashCode();
+                    return ret; 
+                }  
+        }
+
+
+
+        static void jointest()
+          {
+              DataColumn dc1 = new DataColumn("openid");
+              dc1.DataType = typeof(int);
+              DataColumn dc2 = new DataColumn("deviceid");
+              dc2.DataType = typeof(int);
+              DataColumn dc3 = new DataColumn("day");
+              dc3.DataType = typeof(int);
+              dt.Columns.Add(dc1);
+              dt.Columns.Add(dc2);
+              dt.Columns.Add(dc3);
+                  DataRow dr = dt.NewRow();
+                    dr[0] = 1;
+                    dr[1] = 1;
+                    dr[2] = 0;
+                    dt.Rows.Add(dr);
+
+
+                    dr = dt.NewRow();
+                    dr[0] = 1;
+                    dr[1] = 2;
+                    dr[2] =0;
+                    dt.Rows.Add(dr);
+
+                 dr = dt.NewRow();
+                    dr[0] = 1;
+                    dr[1] = 1;
+                    dr[2] = 0;
+                    dt.Rows.Add(dr);
+                    dr = dt.NewRow();
+                    dr[0] = 2;
+                    dr[1] = 1;
+                    dr[2] = 0;
+                    dt.Rows.Add(dr);
+                    dr = dt.NewRow();
+                    dr[0] = 3;
+                    dr[1] = 1;
+                    dr[2] = 0;
+         
+                    dt.Rows.Add(dr);
+                    dr = dt.NewRow();
+                    dr[0] = 1;
+                    dr[1] = 1;
+                    dr[2] = -1;
+                    dt.Rows.Add(dr);
+                    dr = dt.NewRow();
+                    dr[0] = 1;
+                    dr[1] = 1;
+                    dr[2] = -1;
+                    dt.Rows.Add(dr);
+
+                   
+
+                    DataTable tbleft = new DataTable();
+                    tbleft = dt.Clone();
+                  DataRow[] rows =  dt.Select("day = 0");
+                  foreach (DataRow row in rows)  // 将查询的结果添加到dt中； 
+                  {
+                      tbleft.Rows.Add(row.ItemArray);
+                  }
+                  showTable(tbleft);
+
+                  DataTable tbright= new DataTable();
+                  tbright = dt.Clone();
+                  DataRow[] rows2 = dt.Select("day = -1");
+                  foreach (DataRow row in rows2)  // 将查询的结果添加到dt中； 
+                  {
+                      tbright.Rows.Add(row.ItemArray);
+                  }
+                  showTable(tbright);
+               
+                    //差
+                  IEnumerable<DataRow> stillLogin = tbleft.AsEnumerable().Intersect(tbright.AsEnumerable(), new MyDataRowComparer());
+
+                 // IEnumerable<DataRow> stillLogin = tbleft.AsEnumerable().Intersect(tbright.AsEnumerable(), DataRowComparer.Default);
+                  //两个数据源的差集集合
+                  DataTable stillLoginTB = stillLogin.CopyToDataTable();
+                  showTable(stillLoginTB);
+
+
+                    
+          }
+
+
+        static void showTable(DataTable dt)
+        {
+            for(int i=0;i<dt.Rows.Count;++i)
+            {
+                for (int j = 0; j < dt.Columns.Count; j++)
+                {
+                    Console.WriteLine(dt.Rows[i][j].ToString());
+                }
+                Console.WriteLine("");
+            }
+            Console.WriteLine("...................");
+        }
+
+        static void IntTest()
+        {
+            object i64 = 12;
+            UInt64 ui64 = (UInt64)i64;
+            Console.Write(ui64);
+            Console.Read();
+        }
+
+
+        static void Main(string[] args)
+        {
+            jointest();
+            Console.Read();
+
+        }
+ 
+        private static void Select()
+        {
+            DataRow[] arrayDR = dt.Select();
+            foreach(DataRow dr in arrayDR)
+            {
+                Console.WriteLine(dr[0].ToString()+"    "+dr[1].ToString());
+            }
+            Console.ReadLine();
+        }
+ 
+        private static void Select(string filterExpression)
+        {
+            DataRow[] arrayDR = dt.Select(filterExpression);
+            foreach (DataRow dr in arrayDR)
+            {
+                Console.WriteLine(dr[0].ToString() + "    " + dr[1].ToString());
+            }
+            Console.ReadLine();
+        }
+ 
+        private static void Select(string filterExpression, string sort)
+        {
+            DataRow[] arrayDR = dt.Select(filterExpression,sort);
+            foreach (DataRow dr in arrayDR)
+            {
+                Console.WriteLine(dr[0].ToString() + "    " + dr[1].ToString());
+            }
+            Console.ReadLine();
+        }
+ 
+        private static void Select(string filterExpression, string sort, DataViewRowState recordStates)
+        {
+            DataRow[] arrayDR = dt.Select(filterExpression, sort,recordStates);
+            foreach (DataRow dr in arrayDR)
+            {
+                Console.WriteLine(dr[0].ToString() + "    " + dr[1].ToString());
+            }
+            Console.ReadLine();
+        }
+    
+    }
+}

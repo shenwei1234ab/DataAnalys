@@ -12,7 +12,7 @@ using System.Threading;
 
 namespace ConsoleApplication1
 {
-      
+
     class Program
     {
 
@@ -20,7 +20,7 @@ namespace ConsoleApplication1
         {
             long ppid = 46179488366605;
             string openid = Util.PPIdToOpenId(ppid);
-            
+
             Console.Write(openid);
             Console.Write(Util.OpenIdToPPId(openid));
         }
@@ -29,7 +29,7 @@ namespace ConsoleApplication1
         static string m_diamondPayFile = "DiamondPayRecord.txt";
         static string m_diamondPresentFile = "DiamondPresentRecord.txt";
         static Dictionary<string, Channel> m_channelMap = new Dictionary<string, Channel>();
-        static List<Svr> m_svrList=new List<Svr>();         //区域列表
+        static List<Svr> m_svrList = new List<Svr>();         //区域列表
         static List<Channel> m_chanList = new List<Channel>();//渠道列表
         static List<Platform> m_platformList = new List<Platform>();
         static Dictionary<string, Channel> GetChanelMap()
@@ -37,7 +37,7 @@ namespace ConsoleApplication1
             return m_channelMap;
         }
 
-        static Dictionary<string, DiamondPay> m_diamondPayMap= new Dictionary<string, DiamondPay>();
+        static Dictionary<string, DiamondPay> m_diamondPayMap = new Dictionary<string, DiamondPay>();
 
 
         static Dictionary<string, DiamondPresent> m_diamondPresentMap = new Dictionary<string, DiamondPresent>();
@@ -106,7 +106,7 @@ namespace ConsoleApplication1
                 {
                     Int32 id = (Int32)tbResult.Rows[i]["Channel"];
                     String strChId = id.ToString();
-                    if(!m_channelMap.ContainsKey(strChId))
+                    if (!m_channelMap.ContainsKey(strChId))
                     {
                         Log.LogDebug("Not found chanel id :" + strChId);
                         continue;
@@ -119,26 +119,26 @@ namespace ConsoleApplication1
                 Platform iosPF = new Platform(1);
                 m_platformList.Add(androidPF);
                 m_platformList.Add(iosPF);
-                
+
                 //读取DiamondPayRecord
                 readText = File.ReadAllText(m_diamondPayFile, System.Text.Encoding.Default);
                 //反序列化
-                 List<DiamondPay> payList = new List<DiamondPay>();
-                 payList = JsonConvert.DeserializeObject<List<DiamondPay>>(readText);
-                 foreach (var pay in payList)
-                 {
-                     string id = pay.value;
-                     string name = pay.desc;
-                     //第三方不存在渠道ID
-                     if (m_diamondPayMap.ContainsKey(id))
-                     {
-                         Log.LogError("platId:" + id + "already exist");
-                         return false;
-                     }
-                     m_diamondPayMap[id] = pay;
-                 }
+                List<DiamondPay> payList = new List<DiamondPay>();
+                payList = JsonConvert.DeserializeObject<List<DiamondPay>>(readText);
+                foreach (var pay in payList)
+                {
+                    string id = pay.value;
+                    string name = pay.desc;
+                    //第三方不存在渠道ID
+                    if (m_diamondPayMap.ContainsKey(id))
+                    {
+                        Log.LogError("platId:" + id + "already exist");
+                        return false;
+                    }
+                    m_diamondPayMap[id] = pay;
+                }
                 //读取DiamondPresentRecord
-                 readText = File.ReadAllText(m_diamondPresentFile, System.Text.Encoding.Default);
+                readText = File.ReadAllText(m_diamondPresentFile, System.Text.Encoding.Default);
                 List<DiamondPresent> presentList = new List<DiamondPresent>();
                 presentList = JsonConvert.DeserializeObject<List<DiamondPresent>>(readText);
                 foreach (var present in presentList)
@@ -154,10 +154,10 @@ namespace ConsoleApplication1
                     m_diamondPresentMap[id] = present;
                 }
                 if (!m_userRechargeTask.Init(m_svrList, m_chanList, m_platformList))
-               {
-                   return false;
-               }
-               return true;
+                {
+                    return false;
+                }
+                return true;
                 //if(!m_operationTask.Init(m_svrList,m_chanList))
                 //{
                 //    return false;
@@ -172,7 +172,7 @@ namespace ConsoleApplication1
         }
 
 
-      
+
 
         static void AddOperationDataTask(DateTime nowTime)
         {
@@ -184,7 +184,7 @@ namespace ConsoleApplication1
                 //遍历渠道
                 foreach (var channl in m_chanList)
                 {
-                    foreach(var platform in m_platformList)
+                    foreach (var platform in m_platformList)
                     {
                         system.Init(channl, svr, platform);
                         if (!system.AddOperationData(nowTime))
@@ -200,7 +200,7 @@ namespace ConsoleApplication1
 
         static AddUserRechargesTask m_userRechargeTask = new AddUserRechargesTask();
 
-        static void AddUserRechargesTask(DateTime nowTime,DateTime lastTime)
+        static void AddUserRechargesTask(DateTime nowTime, DateTime lastTime)
         {
             m_userRechargeTask.RunTask(nowTime, lastTime);
         }
@@ -214,16 +214,16 @@ namespace ConsoleApplication1
             system.m_diamondPayMap = m_diamondPayMap;
             system.m_diamondPresentMap = m_diamondPresentMap;
             //遍历区
-            foreach(var svr in m_svrList)
+            foreach (var svr in m_svrList)
             {
                 //遍历渠道
-                foreach(var channl in m_chanList)
+                foreach (var channl in m_chanList)
                 {
-                    foreach(var plat in m_platformList)
+                    foreach (var plat in m_platformList)
                     {
                         DateTime time = DateTime.Now.AddDays(-1);
-                        system.Init(channl, svr,plat);
-                        if(!system.PreQuery(time))
+                        system.Init(channl, svr, plat);
+                        if (!system.PreQuery(time))
                         {
                             //在预处理一下
                             system.PreQuery(time);
@@ -281,19 +281,19 @@ namespace ConsoleApplication1
                             Log.LogError("AddRechargeGamerInfo failed");
                         }
                     }
-                   
+
                 }
             }
-                        Log.LogDebug("EveryDay End"); 
+            Log.LogDebug("EveryDay End");
         }
 
-     
 
-       
 
-        static double m_OperationTimeVal = 10*60;        //10分钟
-        static double m_UserRechargeTimeVal = 1 * 60 ;  //充值1分钟
-        static DateTime m_operationlastTime=DateTime.Now;
+
+
+        static double m_OperationTimeVal = 10 * 60;        //10分钟
+        static double m_UserRechargeTimeVal = 1 * 60;  //充值1分钟
+        static DateTime m_operationlastTime = DateTime.Now;
         static DateTime m_userRecharlastTime = DateTime.Now;
         static DateTime m_everyDay;
         static string m_everyDayTime = "3:00:00";
@@ -306,13 +306,13 @@ namespace ConsoleApplication1
             {
                 DateTime nowTime = DateTime.Now;
                 try
-                { 
+                {
                     AddUserRechargesTask(nowTime, m_userRecharlastTime);
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Log.SetFileName("Fatal ERROR");
-                    Log.LogError("AddUserRechargesTask fatal error"+ex.ToString());
+                    Log.LogError("AddUserRechargesTask fatal error" + ex.ToString());
                 }
                 m_userRecharlastTime = nowTime;
             }
@@ -336,7 +336,7 @@ namespace ConsoleApplication1
                 }
                 m_operationlastTime = now;
             }
-           
+
 
             //每天3：00更新
             if (DateTime.Now > m_everyDay)
@@ -345,24 +345,24 @@ namespace ConsoleApplication1
                 {
                     EveryDayTask();
                 }
-                catch(Exception ex)
+                catch (Exception ex)
                 {
                     Log.SetFileName("Fatal ERROR");
                     Log.LogError("EveryDayTask fatal error" + ex.ToString());
                 }
                 string day = DateTime.Now.Year.ToString() + "-" + DateTime.Now.Month.ToString() + "-"
             + DateTime.Now.Day.ToString() + " " + m_everyDayTime;
-               DateTime dt=  Convert.ToDateTime(day);
-               m_everyDay = dt.AddDays(1);
+                DateTime dt = Convert.ToDateTime(day);
+                m_everyDay = dt.AddDays(1);
             }
 
         }
-        
+
 
 
         static void test(DateTime time)
         {
-           //everydayTest
+            //everydayTest
             Log.SetFileName("EveryDay");
             Log.LogDebug("EveryDay start");
             EveryDayTask system = new EveryDayTask();
@@ -436,14 +436,14 @@ namespace ConsoleApplication1
             Log.LogDebug("EveryDay End");
             return;
             //test
-             DateTime lastTime = Convert.ToDateTime("2016-07-26 10:16:38");
-           DateTime FinTime = Convert.ToDateTime("2016-07-26 23:19:38");
-           DateTime nowTime = lastTime.AddMinutes(1);
-           while (nowTime<=FinTime)
+            DateTime lastTime = Convert.ToDateTime("2016-07-26 10:16:38");
+            DateTime FinTime = Convert.ToDateTime("2016-07-26 23:19:38");
+            DateTime nowTime = lastTime.AddMinutes(1);
+            while (nowTime <= FinTime)
             {
-                 AddUserRechargesTask(nowTime, lastTime);
-                 lastTime = nowTime;
-                 nowTime = nowTime.AddMinutes(1);
+                AddUserRechargesTask(nowTime, lastTime);
+                lastTime = nowTime;
+                nowTime = nowTime.AddMinutes(1);
             }
             Log.SetFileName("EveryDay");
             Log.LogDebug("EveryDay Start");
@@ -452,7 +452,7 @@ namespace ConsoleApplication1
 
         static void OperationTest()
         {
-            m_OperationTimeVal = 1*30;
+            m_OperationTimeVal = 1 * 30;
             Update();
         }
 
@@ -461,7 +461,7 @@ namespace ConsoleApplication1
         static void Main(string[] args)
         {
             //ppidToOpenId();
-            string day = DateTime.Now.Year.ToString()+"-"+ DateTime.Now.Month.ToString()+"-"
+            string day = DateTime.Now.Year.ToString() + "-" + DateTime.Now.Month.ToString() + "-"
             + DateTime.Now.Day.ToString() + " " + m_everyDayTime;
             m_everyDay = Convert.ToDateTime(day);
             if (!SqlManager.GetInstance().Init())
@@ -469,7 +469,7 @@ namespace ConsoleApplication1
                 Log.LogError("sqlManager init failed");
                 return;
             }
-            if(!Log.Init())
+            if (!Log.Init())
             {
                 Log.LogError("LoadLogConfig failed");
                 return;
@@ -484,12 +484,12 @@ namespace ConsoleApplication1
             //test
             DateTime testTime = Convert.ToDateTime("2016-08-03 18:38:00");
             test(testTime);
-            
+
             //while (true)
             //{
             //    Update();
             //}
         }
     }
-    
+
 }

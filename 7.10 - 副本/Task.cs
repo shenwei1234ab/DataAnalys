@@ -13,7 +13,7 @@ public class TaskData
     public Svr m_svr;           //区
     public Platform m_plat;
     public string m_postSvrInfo;
-    public  Dictionary<string, Order> m_orderDatas = new Dictionary<string, Order>();
+    public Dictionary<string, Order> m_orderDatas = new Dictionary<string, Order>();
 }
 //区
 public class Task
@@ -165,10 +165,10 @@ public class Task
     protected string m_gameName = "我的美女老师";
     // protected string m_gameServerIP = "123.206.200.181:8801";
 
-   // protected string m_postSvrInfo = "";//要提交的gamesvrip=127.0.0.+"区Id":"渠道"
+    // protected string m_postSvrInfo = "";//要提交的gamesvrip=127.0.0.+"区Id":"渠道"
 
-   // public Channel m_channel;       //渠道
-   // public Svr m_svr;           //区
+    // public Channel m_channel;       //渠道
+    // public Svr m_svr;           //区
 
     protected string m_gameServerName = "";
     protected string m_userToken = "c2ab32e4t673802c";
@@ -179,15 +179,15 @@ public class Task
 
     protected List<TaskData> m_taskData = new List<TaskData>();
 
-   
 
-    public virtual bool Init(List<Svr> svrList, List<Channel> chanList,List<Platform> platList)
+
+    public virtual bool Init(List<Svr> svrList, List<Channel> chanList, List<Platform> platList)
     {
         foreach (var svr in svrList)
         {
             foreach (var chan in chanList)
             {
-                foreach(var plat in platList)
+                foreach (var plat in platList)
                 {
                     TaskData data = new TaskData();
                     data.m_channel = chan;
@@ -196,11 +196,11 @@ public class Task
                     data.m_plat = plat;
                     m_taskData.Add(data);
                 }
-              
+
             }
         }
         return true;
     }
 
 }
-#endregion
+    #endregion

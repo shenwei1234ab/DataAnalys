@@ -97,6 +97,7 @@
     <Compile Include="DiamondPay.cs" />
     <Compile Include="PlatformOs.cs" />
     <Compile Include="Task.cs" />
+    <Compile Include="AnalysisSystem.cs" />
     <Compile Include="EveryDayTask.cs" />
     <Compile Include="PcuTimeval.cs" />
     <Compile Include="FileSystem.cs" />
@@ -127,7 +128,6 @@
     <Content Include="sqlTest.txt" />
     <Content Include="REDAME.txt" />
     <Content Include="dateTableTest.txt" />
-    <Content Include="部署.txt" />
     <Content Include="test.txt" />
   </ItemGroup>
   <ItemGroup>

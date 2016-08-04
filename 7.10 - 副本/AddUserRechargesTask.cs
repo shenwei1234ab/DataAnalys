@@ -23,19 +23,23 @@ public class AddUserRechargesTask:Task
     private bool AddUserRecharges(DateTime date, DateTime lastTime,TaskData data)
     {
         m_actionNameURL = "addUserRecharges";
-       DataTable resultTb = new DataTable();
-        MySql.Data.MySqlClient.MySqlParameter[] array = { 
-       new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()),
-       new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id),
-        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId),
-        new MySql.Data.MySqlClient.MySqlParameter("?lastdate", lastTime.ToString()),
-         new MySql.Data.MySqlClient.MySqlParameter("?OsId", data.m_plat)
-};
-        if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_AddUserRecharges, ref resultTb, array) < 0)
+       string strMsg = "";
+        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_AddUserRecharges);
+        DataTable resultTb = new DataTable();
+        if (st == null)
         {
+            Log.LogError("sql:" + st.GetCommand() + "not register");
             return false;
         }
-
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date", date.ToString()));
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId));
+        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?lastdate", lastTime.ToString()));
+        if (!st.Execute(ref resultTb, ref strMsg))
+        {
+            Log.LogError("sql:" + st.GetCommand() + "execute error" + strMsg);
+            return false;
+        }
         bool ret = true;
         //查询数据库订单状态
         //2: 支付成功PaySuccess，通知成功NotifySuccess
@@ -98,6 +102,18 @@ public class AddUserRechargesTask:Task
                 }
                 else if (status == "0")
                 {
+                    //TimeSpan span = (TimeSpan)(date - orderCreateTime);
+                    ////todo
+                    //if (span.Minutes < 1)
+                    //{
+                    //    order.m_orderState = OrderState.CreateSuccess;
+                    //}
+                    //else
+                    //{
+                    //    order.m_orderState = OrderState.PayFailed;
+                    //}
+                    //order.m_rechargeState = rechargetState.NoPayed;
+                    
                     Order order = new Order(orderid, ppid, nickname, playerid, accountCreateTime, orderCreateTime.ToString(), decimal.Parse(orderMoney).ToString("#0.00"), channelOrderNo, mainChannelNamel);
                     order.m_orderState = OrderState.CreateSuccess;
                     order.m_rechargeState = rechargetState.NoPayed;
@@ -157,7 +173,7 @@ public class AddUserRechargesTask:Task
  "&orderState=" + (int)order.m_orderState;
             if (Post() == 0)
             {
-                Log.LogError("AddUserRecharges failed:");
+                Log.LogError("AddUserRecharges failed:" + strMsg);
                 ret = false;
             }
         }
