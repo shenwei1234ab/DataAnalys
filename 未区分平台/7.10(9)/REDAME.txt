@@ -1,0 +1,60 @@
+在app.config中配置数据库连接信息
+建表的时候要区分大小写(sql中有些区分了大小写，有些可能遗忘了),字符集为utf-8
+某日新增角色的等级分布:默认没升级的等级是1级
+
+
+
+
+
+计算留存率以今天为基准
+昨日：-1
+3日：-2
+由于mysql 只支持union ,用左外连接实现差集
+涉及账号付费，金币，钻石 查询查询的是tdgame_46001      定义宏在MAX_TDGAME_46001
+涉及账号注册，登陆，角色升级查询的是netlog     定义宏在MAX_DB_NETLOG
+运营数据（addOperationData）中的新启动设备数和启动设备数和新增设备数 无法从服务器获得，只能以今日注册设备数取代
+玩家=角色
+
+
+
+
+
+
+
+
+//总结
+sql 对应维恩图
+异常处理system.invalidcastexception
+日志不能用宏
+
+
+
+//todo
+AddGamerLevelChanges 自定义集合操作
+
+
+AddGamerLevelLeft 自定义集合操作
+
+//////////////////////////////////////////////////////程序可能的运行错误及解决方法
+1.Packets larger than max_allowed_packet are not allowed
+解决：
+set global max_allowed_packet = 2*1024*1024*10;
+或者改进
+sql语句分成两句
+
+2.WebException ex异常
+无法连接到远程服务器 ---> System.Net.Sockets.SocketException: 由于连接方在一段时间后没有正确答复或连接的主机没有反应，连接尝试失败
+远程主机超时
+设置重传
+
+
+3.账号的登录数比角色的登录数多
+检查数据库是否区分了大小写
+
+
+
+4.Newtonsoft.Json编译到目标框架失败
+重新下载对应平台的Newtonsoft.Json.dll
+
+
+

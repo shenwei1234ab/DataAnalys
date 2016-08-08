@@ -1,0 +1,26 @@
+部署流程：
+1.#define _DEBUG 去除宏开关
+2.配置App.config文件设置数据库访问地址
+3.根据服务器选择对应平台编译
+4.放入channel.txt和svrarea.txt配置文件
+5.放入DiamondPayRecord.txt，DiamondPresentRecord.txt配置文件
+6.放入MySql.Data.dll和Newtonsoft.Json.dll到程序运行目录
+7.运行程序，检查程序是否能运行有报错的话检查以上配置文件和MySql.Data.dll和Newtonsoft.Json.dll是否存在和配置正确
+
+
+
+问题：
+1.Packets larger than max_allowed_packet are not allowed
+解决：
+set global max_allowed_packet = 2*1024*1024*10;
+或者改进
+sql语句分成两句
+
+2.WebException ex异常
+无法连接到远程服务器 ---> System.Net.Sockets.SocketException: 由于连接方在一段时间后没有正确答复或连接的主机没有反应，连接尝试失败
+远程主机超时
+
+
+3.账号的登录数比角色的登录数多
+检查数据库是否区分了大小写
+

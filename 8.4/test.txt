@@ -1,0 +1,57 @@
+mysql 今日
+now()
+昨日 date_add(now(),interval-1 day)
+COLLATE utf8_bin
+select distinct vopenid,SvrAreaId   from PlayerRegister
+
+c# 
+DateTime  now = DateTime.Now.AddDays(0); 
+
+
+区分大小写COLLATE utf8_bin
+vopenid = HAcAAAABAAA=        shenwei1234   内尔南希  6 区  1805  85  lv   5  
+
+
+
+ppid = 1099511629596
+											 9 区   0  20       lv 2
+
+
+https://www.douban.com/note/152751041/
+http://bbs.csdn.net/topics/360003771
+SELECT * from PlayerLogin where vopenid="HAcAAAABAAA="
+
+
+
+vopenid =XgoAAAABAAA=                      shenbin1234           6  区
+
+
+
+
+//检查重复
+ select count(vopenid) as sum ,vopenid from PlayerRegister GROUP BY vopenid;
+
+
+
+ UInt32 price = (UInt32)resultTb.Rows[i]["price"];
+            decimal dprice = price;
+
+
+
+
+ifnull(t1.MaxLevel,1)as level
+
+
+
+
+
+//////////todo
+DataRowComparer.Default
+
+ //time = Convert.ToDateTime("2016-07-08 19:29:20"); 
+
+
+    MySql.Data.MySqlClient.MySqlParameter[] array = { 
+        new MySql.Data.MySqlClient.MySqlParameter("?date", gaDateTime),
+        new MySql.Data.MySqlClient.MySqlParameter("?Channel", m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", m_svr.m_SvrAreaId)};
