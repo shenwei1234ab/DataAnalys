@@ -131,22 +131,14 @@ public class AddOperationDataTask:AnalysisSystem
                     Log.LogError(ex.ToString());
                 }
             }
-            //inner join
-            var netLogPay = from newLog in newLogTB.AsEnumerable()
-                            join payaccount in payaccountTB.AsEnumerable()
-                            on newLog.Field<UInt64>("ppid") equals payaccount.Field<UInt64>("ppid")
-                            select new
-                            {
-                                sum = payaccount.Field<decimal>("sum"),
-                            };
-            foreach (var payAccount in netLogPay)
+            IEnumerable<DataRow> newLogPay = newLogTB.AsEnumerable().Intersect(payaccountTB.AsEnumerable(), new PayAccountDataRowComparer());
+            if (newLogPay.Count() != 0)
             {
-                opFirstPayAccountNum += 1;
-                opFirstPayIncome += payAccount.sum;
+                newLogPayTb = newLogPay.CopyToDataTable();
             }
         }
 
-       // opFirstPayAccountNum = newLogPayTb.Rows.Count;
+        opFirstPayAccountNum = newLogPayTb.Rows.Count;
         if (newLogPayTb.Rows.Count > 0 && opFirstLoginAccountNum > 0)
         {
             opFirstLoginPayPercent = (decimal)newLogPayTb.Rows.Count / opFirstLoginAccountNum;
@@ -156,18 +148,18 @@ public class AddOperationDataTask:AnalysisSystem
                 Log.LogError("calculate opFirstLoginPayPercent failed");
             }
         }
-        //for (int i = 0; i < newLogPayTb.Rows.Count; ++i)
-        //{
-        //    try
-        //    {
-        //        Decimal sum = (Decimal)newLogPayTb.Rows[i]["sum"];
-        //        opFirstPayIncome += sum;
-        //    }
-        //    catch (Exception ex)
-        //    {
-        //        Log.LogError(ex.ToString());
-        //    }
-        //}
+        for (int i = 0; i < newLogPayTb.Rows.Count; ++i)
+        {
+            try
+            {
+                Decimal sum = (Decimal)newLogPayTb.Rows[i]["sum"];
+                opFirstPayIncome += sum;
+            }
+            catch (Exception ex)
+            {
+                Log.LogError(ex.ToString());
+            }
+        }
     
         //新付费账号数
         //获取付费的新玩家

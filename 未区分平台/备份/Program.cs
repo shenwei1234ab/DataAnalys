@@ -1,4 +1,4 @@
-﻿//#define _DEBUG
+﻿#define _DEBUG
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,11 +24,6 @@ namespace ConsoleApplication1
         //    Console.Write(openid);
         //    Console.Write(Util.OpenIdToPPId(openid));
         //}
-
-        static void linqTest()
-        {
-
-        }
 
         static string m_channelConfigFile = "channel.txt";
         static string m_svrareaConfigFile = "svrarea.txt";
@@ -289,15 +284,15 @@ namespace ConsoleApplication1
         static void MyEveryDayTest(DateTime dtStart, DateTime dtEnd)
         {
             //收费测试
-            DateTime lastTime = dtStart;
-            DateTime FinTime = dtEnd;
-            DateTime nowTime = lastTime.AddMinutes(1);
-            while (nowTime <= FinTime)
-            {
-               AddUserRechargesTask(nowTime, lastTime);
-                lastTime = nowTime;
-                nowTime = nowTime.AddMinutes(1);
-            }
+            //DateTime lastTime = dtStart;
+            //DateTime FinTime = dtEnd;
+            //DateTime nowTime = lastTime.AddMinutes(1);
+            //while (nowTime <= FinTime)
+            //{
+            //    AddUserRechargesTask(nowTime, lastTime);
+            //    lastTime = nowTime;
+            //    nowTime = nowTime.AddMinutes(1);
+            //}
             
             //DateTime fiveStart = dtStart;
             //for (; fiveStart <= dtEnd; )
@@ -307,12 +302,12 @@ namespace ConsoleApplication1
             //}
 
             //每天任务测试
-            //DateTime everyStart = dtStart;
-            //for (; everyStart <= dtEnd; )
-            //{
-            //    m_everydayTask.RunTask(everyStart);
-            //    everyStart = everyStart.AddDays(1);
-            //}
+            DateTime everyStart = dtStart;
+            for (; everyStart <= dtEnd; )
+            {
+                m_everydayTask.RunTask(everyStart);
+                everyStart = everyStart.AddDays(1);
+            }
         }
 
 
@@ -340,8 +335,8 @@ namespace ConsoleApplication1
             }
 
             //test
-            DateTime dtStart = Convert.ToDateTime("2016-07-08 16:00:00");
-            DateTime dtEnd = Convert.ToDateTime("2016-07-08 19:00:00");
+            DateTime dtStart = Convert.ToDateTime("2016-07-01 16:00:00");
+            DateTime dtEnd = Convert.ToDateTime("2016-07-01 19:00:00");
             MyEveryDayTest(dtStart, dtEnd);
             //while (true)
             //{
