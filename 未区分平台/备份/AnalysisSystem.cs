@@ -145,11 +145,12 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
     }
 #endregion
 
-    public virtual bool Init(List<Svr> svrList, List<Channel> chanList,Dictionary<string, DiamondPay> diamondPayMap,Dictionary<string, DiamondPresent> diamondPresentMap)
+    public virtual bool Init(List<Svr> svrList, List<Channel> chanList,Dictionary<string, DiamondPay> diamondPayMap,Dictionary<string, DiamondPresent> diamondPresentMap,DateTime startTime)
     {
         base.Init(svrList, chanList);
         m_diamondPayMap = diamondPayMap;
         m_diamondPresentMap = diamondPresentMap;
+        m_startTime = startTime;
         return true;
     }
 
@@ -178,47 +179,47 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
         {
             Log.LogDebug("AddChannels failed");
         }
-        if (!AddGamersRetention(time,taskdata))
+        if (!AddGamersRetention(time, taskdata))
         {
             Log.LogError("AddGamersRetention failed");
         }
-        if (!AddGamersRoleRetention(time,taskdata))
+        if (!AddGamersRoleRetention(time, taskdata))
         {
             Log.LogError("AddGamersRoleRetention failed");
         }
-        if (!AddGamersEquipRetention(time,taskdata))
+        if (!AddGamersEquipRetention(time, taskdata))
         {
             Log.LogError("AddGamersEquipRetention failed");
         }
-        if (!AddCommonLtvWorth(time,taskdata))
+        if (!AddCommonLtvWorth(time, taskdata))
         {
             Log.LogError("AddCommonLtvWorth failed");
         }
-        if (!AddGamersDayWorth(time,taskdata))
+        if (!AddGamersDayWorth(time, taskdata))
         {
             Log.LogError("AddGamersDayWorth failed");
         }
-        if (!AddEveryDayAddGamerLevelFenbu(time,taskdata))
+        if (!AddEveryDayAddGamerLevelFenbu(time, taskdata))
         {
             Log.LogError("AddEveryDayAddGamerLevelFenbu failed");
         }
-        if (!AddAllGemerLevelFenbu(time,taskdata))
+        if (!AddAllGemerLevelFenbu(time, taskdata))
         {
             Log.LogError("AddAllGemerLevelFenbu failed");
         }
-        if (!AddGamerLevelChanges(time,taskdata))
+        if (!AddGamerLevelChanges(time, taskdata))
         {
             Log.LogError("AddGamerLevelChanges failed");
         }
-        if (!AddGamerLevelLeft(time,taskdata))
+        if (!AddGamerLevelLeft(time, taskdata))
         {
             Log.LogError("AddGamerLevelLeft failed");
         }
-        if (!AddVirtualCornCost(time,taskdata))
+        if (!AddVirtualCornCost(time, taskdata))
         {
             Log.LogError("AddVirtualCornCost failed");
         }
-        if (!AddRechargeGamerInfo(time,taskdata))
+        if (!AddRechargeGamerInfo(time, taskdata))
         {
             Log.LogError("AddRechargeGamerInfo failed");
         }
@@ -334,7 +335,7 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
 
 
         //新登付费账号 = 今日新登账号&&付费的账号 
-        DataTable newLogPayTb = new DataTable();
+        //DataTable newLogPayTb = new DataTable();
         if (newLogTB.Rows.Count > 0 && payaccountTB.Rows.Count > 0)
         {
             //newLogTB 的 openid 转为ppid
@@ -358,14 +359,29 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
                 }
             }
             //内连
-            IEnumerable<DataRow> newLogPay = newLogTB.AsEnumerable().Intersect(payaccountTB.AsEnumerable(), new PayAccountDataRowComparer());
-            if (newLogPay.Count() != 0)
+
+            //IEnumerable<DataRow> newLogPay = newLogTB.AsEnumerable().Intersect(payaccountTB.AsEnumerable(), new PayAccountDataRowComparer());
+            //if (newLogPay.Count() != 0)
+            //{
+            //    newLogPayTb = newLogPay.CopyToDataTable();
+            //}
+           // inner join
+            var netLogPay = from newLog in newLogTB.AsEnumerable()
+                            join payaccount in payaccountTB.AsEnumerable()
+                            on newLog.Field<UInt64>("ppid") equals payaccount.Field<UInt64>("ppid")
+                            select new
+                            {
+                                sum = payaccount.Field<decimal>("sum"),
+                            };
+            foreach(var payAccount in netLogPay)
             {
-                newLogPayTb = newLogPay.CopyToDataTable();
+                gaFirstLoginPayAccountNum += 1;
+                gaFirstLoginPayAccountIncome += payAccount.sum;
             }
+
         }
         //新登付费账号数
-        gaFirstLoginPayAccountNum = newLogPayTb.Rows.Count;
+       // gaFirstLoginPayAccountNum = newLogPayTb.Rows.Count;
         m_gaFirstLoginPayAccountNum = gaFirstLoginPayAccountNum;
        
         if (gaFirstLoginPayAccountNum > 0 && gaFirstLoginAccountNum > 0)
@@ -379,18 +395,18 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
             }
         }
         //新登付费账号收入
-        for (int i = 0; i < newLogPayTb.Rows.Count; ++i)
-        {
-            try
-            {
-                Decimal sum = (Decimal)newLogPayTb.Rows[i]["sum"];
-                gaFirstLoginPayAccountIncome += sum;
-            }
-            catch (Exception ex)
-            {
-                Log.LogError(ex.ToString());
-            }
-        }
+        //for (int i = 0; i < newLogPayTb.Rows.Count; ++i)
+        //{
+        //    try
+        //    {
+        //        Decimal sum = (Decimal)newLogPayTb.Rows[i]["sum"];
+        //        gaFirstLoginPayAccountIncome += sum;
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        Log.LogError(ex.ToString());
+        //    }
+        //}
         m_gaFirstLoginPayAccountIncome = gaFirstLoginPayAccountIncome;
         ////之前付费的账号
         //DataTable paybeforeTB = new DataTable();
@@ -982,65 +998,120 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
         }
         return true;
     }
+
+
+
+    //计算time日新登账号newaccountTB在days内里付费总数
+    public bool GetLTV(DateTime time, int days, DataTable newaccountTB, ref decimal totalIncome, TaskData data)
+    {
+        string msg = "";
+        //截止日期
+        DateTime endDate = time.AddDays(days - 1);
+        for (int j = 0; j < newaccountTB.Rows.Count; ++j)
+        {
+            string vopenid = newaccountTB.Rows[j]["openid"].ToString();
+            //转为ppid
+            string ppid = Util.OpenIdToPPId(vopenid);
+            //查询新登账号 date1 - date2 的所有收入
+            SqlStament stGetSum = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_LTV_ACCOUNT_PAY);
+            if (stGetSum == null)
+            {
+                return false;
+            }
+            stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date1", time));
+            stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date2", endDate));
+            stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?ppid", ppid.ToString()));
+            stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
+            stGetSum.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId));
+            DataTable tbSum = new DataTable();
+            if (!stGetSum.Execute(ref tbSum, ref msg))
+            {
+                return false;
+            }
+            decimal sum = 0m;
+            try
+            {
+                sum = (decimal)tbSum.Rows[0]["sum"];
+            }
+            catch (Exception ex)
+            {
+                Log.LogError(ex.ToString());
+            }
+            totalIncome += sum;
+        }
+        return true;
+    }
+
 #region//常规LTV价值数据 
     public bool AddCommonLtvWorth(DateTime time, TaskData data)
     {
         m_actionNameURL = "addCommonLtvWorth";
-        Int64 gaFirstLoginAccountNum = 0;
-        //今日新登账号数
-        MySql.Data.MySqlClient.MySqlParameter[] newArr = {
- new MySql.Data.MySqlClient.MySqlParameter("?date", time.ToString()),
-  new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id),
-  new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId),
-
-};
-        if (!GetAggregateResult<Int64>(SqlCommand.SELECT_COUNT_NEWAccount, "count", ref gaFirstLoginAccountNum, newArr))
+        int []dayarray=new int[4];
+        dayarray[0] = 3;
+        dayarray[1] = 7;
+        dayarray[2] = 15;
+        dayarray[3] = 30;
+        for (int index = 0; index < dayarray.Length; ++index)
         {
-            return false;
-        }
-        sLTV[] dataArray = new sLTV[] { new sLTV(3), new sLTV(7), new sLTV(15), new sLTV(30) };
-        for (int i = 0; i < dataArray.Length; ++i)
-        {
-            int day = dataArray[i].day;
-            decimal totalIncome = 0m;
-            int newaccountNum = 0;
-            if (!GetNewAccountDaySumIncome(time, day, ref newaccountNum, ref  totalIncome, data))
+            //要提交的时间
+            DateTime coDateTime = time.AddDays(1-dayarray[index]);
+            if(coDateTime < m_startTime )
+            {
+                continue;
+            }
+            //当日新登账号
+            DataTable newaccountTB = new DataTable();
+            MySql.Data.MySqlClient.MySqlParameter[] array = { 
+     new MySql.Data.MySqlClient.MySqlParameter("?date", coDateTime),
+    new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId)};
+            if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_NEWAccount, ref newaccountTB, array) < 0)
             {
                 return false;
             }
-            //计算ltv
-            if (newaccountNum > 0)
+
+            int gaFirstLoginAccountNum = newaccountTB.Rows.Count;
+            //
+            sLTV[] dataArray = new sLTV[] { new sLTV(3), new sLTV(7), new sLTV(15), new sLTV(30) };
+            if(gaFirstLoginAccountNum >0 )
             {
-                dataArray[i].ltv = totalIncome / newaccountNum;
+                //计算ltv
+
+                for (int i = 0; i < dataArray.Length; ++i)
+                {
+                    int day = dataArray[i].day;
+                    decimal totalIncome = 0m;
+                    if (!GetLTV(coDateTime, day, newaccountTB, ref  totalIncome, data))
+                    {
+                        return false;
+                    }
+                    //计算ltv
+                    if (gaFirstLoginAccountNum > 0)
+                    {
+                        dataArray[i].ltv = totalIncome / gaFirstLoginAccountNum;
+                    }
+                    dataArray[i].totalIncome = totalIncome;
+                }
             }
-            dataArray[i].totalIncome = totalIncome;
-            //post
-
-
-
-
+            m_postData = "coDateTime=" +coDateTime+
+            "&gameServerIp=" + data.m_postSvrInfo +
+            "&userToken=" + m_userToken +
+            "&coPlatform=" + data.m_channel.Platform +
+            "&coFirstLoginAccountNum=" + gaFirstLoginAccountNum +
+            "&coThreeDayLtv=" + dataArray[0].ltv.ToString("#0.00") +
+            "&coSevenDayLtv=" + dataArray[1].ltv.ToString("#0.00") +
+            "&coFifteenDayLtv=" + dataArray[2].ltv.ToString("#0.00") +
+            "&coThirtyDayLtv=" + dataArray[3].ltv.ToString("#0.00") +
+            "&coThreeDayIncome=" + dataArray[0].totalIncome.ToString("#0.00") +
+            "&coSevenDayIncome=" + dataArray[1].totalIncome.ToString("#0.00") +
+            "&coFifteenDayIncome=" + dataArray[2].totalIncome.ToString("#0.00") +
+            "&coThirtyDayIncome=" + dataArray[3].totalIncome.ToString("#0.00");
+            if (Post() == 0)
+            {
+                Log.LogError("AddCommonLtvWorth failed:");
+            }
         }
-        bool ret = true;
-        m_postData = "coDateTime=" + time.ToString() +
-        "&gameServerIp=" + data.m_postSvrInfo +
-        "&userToken=" + m_userToken +
-        "&coPlatform=" + data.m_channel.Platform +
-        "&coFirstLoginAccountNum=" + gaFirstLoginAccountNum +
-        "&coThreeDayLtv=" + dataArray[0].ltv.ToString("#0.00") +
-        "&coSevenDayLtv=" + dataArray[1].ltv.ToString("#0.00") +
-        "&coFifteenDayLtv=" + dataArray[2].ltv.ToString("#0.00") +
-        "&coThirtyDayLtv=" + dataArray[3].ltv.ToString("#0.00") +
-        "&coThreeDayIncome=" + dataArray[0].totalIncome.ToString("#0.00") +
-        "&coSevenDayIncome=" + dataArray[1].totalIncome.ToString("#0.00") +
-        "&coFifteenDayIncome=" + dataArray[2].totalIncome.ToString("#0.00") +
-        "&coThirtyDayIncome=" + dataArray[3].totalIncome.ToString("#0.00");
-        if (Post() == 0)
-        {
-            Log.LogError("AddCommonLtvWorth failed:" );
-            ret = false;
-        }
-        return ret;
-
+        return true;
     }
 #endregion
 
@@ -1063,98 +1134,114 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
     public bool AddGamersDayWorth(DateTime time, TaskData data)
     {
         m_actionNameURL = "addGamersDayWorth";
-        string msg = "";
-        DataTable tbResult = new DataTable();
-        //付费用户数
-        int gaPayAccountNum = 0;
-        //获取今日付费的账号
-        SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_ACCOUNT);
-        if (st == null)
+         int []dayarray=new int[4];
+        dayarray[0] = 3;
+        dayarray[1] = 7;
+        dayarray[2] = 15;
+        dayarray[3] = 30;
+        for (int index = 0; index < dayarray.Length; ++index)
         {
-            Log.LogError("sql:" + st.GetCommand() + "not register");
-            return false;
-        }
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date", time.ToString()));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
-        st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId));
-        if (!st.Execute(ref tbResult, ref msg))
-        {
-            Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-            return false;
-        }
-        gaPayAccountNum = tbResult.Rows.Count;
-        DayWorth[] dataArray = new DayWorth[] { new DayWorth(3), new DayWorth(7), new DayWorth(15), new DayWorth(30) };
-        for (int i = 0; i < dataArray.Length; ++i)
-        {
-
-            int RepeatPayAccountNum = 0;
-            int day = dataArray[i].day;
-            DateTime date1 = time.AddDays(-day + 1);
-            //查询date1-当期间所有用户的付费次数
-            st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_ACCOUNT_COUNT);
-            if (st == null)
+            //计算时间
+            //要提交的时间
+            DateTime gaDateTime = time.AddDays(1- dayarray[index]);
+            if (gaDateTime < m_startTime)
             {
-                Log.LogError("sql:" + st.GetCommand() + "not register");
+                continue;
+            }
+            string msg = "";
+            DataTable tbResult = new DataTable();
+            //付费用户数
+           
+            //获取今日付费的账号
+            MySql.Data.MySqlClient.MySqlParameter[] array = { 
+     new MySql.Data.MySqlClient.MySqlParameter("?date", gaDateTime),
+    new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id),
+        new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId)};
+            if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_PAY_ACCOUNT, ref tbResult,array)<0)
+            {
+                Log.LogError("addGamersDayWorth failed");
                 return false;
             }
-            st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date1", date1.ToString()));
-            st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date2", time.ToString()));
-            st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
-            st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId));
-            if (!st.Execute(ref tbResult, ref msg))
+            int gaPayAccountNum = tbResult.Rows.Count;
+            DayWorth[] dataArray = new DayWorth[] { new DayWorth(3), new DayWorth(7), new DayWorth(15), new DayWorth(30) };
+            for (int i = 0; i < dataArray.Length; ++i)
             {
-                Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
-                return false;
-            }
-            //计算重复付费账号数
-            for (int j = 0; j < tbResult.Rows.Count; ++j)
-            {
-                try
+                int RepeatPayAccountNum = 0;
+                int day = dataArray[i].day;
+                //截止日期
+                DateTime endDate = gaDateTime.AddDays(day - 1);
+                //查询gaDateTime-date1期间所有用户的付费次数
+             SqlStament st=   SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_PAY_ACCOUNT_COUNT);
+                if (st == null)
                 {
-                    //获取每个Openid的付费次数
-                    Int64 payCount = (Int64)tbResult.Rows[j]["count"];
-                    if (payCount >= 2)
+                    Log.LogError("sql:" + st.GetCommand() + "not register");
+                    return false;
+                }
+                st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date1", gaDateTime));
+                st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?date2", endDate));
+                st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?Channel", data.m_channel.Id));
+                st.SetParameter(new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId", data.m_svr.m_SvrAreaId));
+                if (!st.Execute(ref tbResult, ref msg))
+                {
+                    Log.LogError("sql:" + st.GetCommand() + "execute error" + msg);
+                    return false;
+                }
+                //计算重复付费账号数
+                for (int j = 0; j < tbResult.Rows.Count; ++j)
+                {
+                    try
                     {
-                        RepeatPayAccountNum++;
+                        //获取每个Openid的付费次数
+                        Int64 payCount = (Int64)tbResult.Rows[j]["count"];
+                        if (payCount >= 2)
+                        {
+                            RepeatPayAccountNum++;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Log.LogError(ex.ToString());
                     }
                 }
-                catch(Exception ex)
+                dataArray[i].RepeatPayAccountNum = RepeatPayAccountNum;
+                decimal SumIncome = 0m;
+                //获取当日新登账号
+                DataTable newaccountTB = new DataTable();
+                if (SqlManager.GetInstance().SetAndExecute(SqlCommand.SELECT_NEWAccount, ref newaccountTB, array) < 0)
                 {
-                    Log.LogError(ex.ToString());
-                }            
+                    return false;
+                }
+                if (newaccountTB.Rows.Count>0)
+                {
+                    //第一日新增账号付费总额
+                    if (!GetLTV(gaDateTime, day, newaccountTB, ref  SumIncome, data))
+                    {
+                        return false;
+                    }
+                    dataArray[i].SumIncome = SumIncome;
+                }
             }
-            dataArray[i].RepeatPayAccountNum = RepeatPayAccountNum;
-            int newaccountNum = 0;
-            decimal SumIncome = 0m;
-            //第一日新增账号付费总额
-            if (!GetNewAccountDaySumIncome(time, day, ref newaccountNum, ref  SumIncome, data))
+            string strFormat = "#0.00";
+            //提交
+            m_postData = "gaDateTime=" + gaDateTime +
+            "&gameServerIp=" + data.m_postSvrInfo +
+            "&userToken=" + m_userToken +
+            "&gaPlatform=" + data.m_channel.Platform +
+            "&gaPayAccountNum=" + gaPayAccountNum.ToString() +
+            "&gaThreeDayRepeatPayAccountNum=" + dataArray[0].RepeatPayAccountNum.ToString() +
+            "&gaSevenDayRepeatPayAccountNum=" + dataArray[1].RepeatPayAccountNum.ToString() +
+            "&gaFifteenDayRepeatPayAccountNum=" + dataArray[2].RepeatPayAccountNum.ToString() +
+            "&gaThirtyDayRepeatPayAccountNum=" + dataArray[3].RepeatPayAccountNum.ToString() +
+            "&gaAddThreeDaySumIncome=" + dataArray[0].SumIncome.ToString(strFormat) +
+            "&gaAddSevenDaySumIncome=" + dataArray[1].SumIncome.ToString(strFormat) +
+            "&gaAddFifteenDaySumIncome=" + dataArray[2].SumIncome.ToString(strFormat) +
+            "&gaAddThirtyDaySumIncome=" + dataArray[3].SumIncome.ToString(strFormat);
+            if (Post() == 0)
             {
-                return false;
+                Log.LogError("AddCommonLtvWorth failed:");
             }
-            dataArray[i].SumIncome = SumIncome;
         }
-        bool ret = true;
-        string strFormat = "#0.00";
-        //提交
-        m_postData = "gaDateTime=" + time +
-        "&gameServerIp=" + data.m_postSvrInfo +
-        "&userToken=" + m_userToken +
-        "&gaPlatform=" + data.m_channel.Platform +
-        "&gaPayAccountNum=" + gaPayAccountNum.ToString() +
-        "&gaThreeDayRepeatPayAccountNum=" + dataArray[0].RepeatPayAccountNum.ToString() +
-        "&gaSevenDayRepeatPayAccountNum=" + dataArray[1].RepeatPayAccountNum.ToString() +
-        "&gaFifteenDayRepeatPayAccountNum=" + dataArray[2].RepeatPayAccountNum.ToString() +
-        "&gaThirtyDayRepeatPayAccountNum=" + dataArray[3].RepeatPayAccountNum.ToString() +
-        "&gaAddThreeDaySumIncome=" + dataArray[0].SumIncome.ToString(strFormat) +
-        "&gaAddSevenDaySumIncome=" + dataArray[1].SumIncome.ToString(strFormat) +
-        "&gaAddFifteenDaySumIncome=" + dataArray[2].SumIncome.ToString(strFormat) +
-        "&gaAddThirtyDaySumIncome=" + dataArray[3].SumIncome.ToString(strFormat);
-        if (Post() == 0)
-        {
-            Log.LogError("AddCommonLtvWorth failed:" );
-            ret = false;
-        }
-        return ret;
+        return true;
     }
 
 #endregion
@@ -1295,9 +1382,13 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
 
     public bool AddGamerLevelChanges(DateTime time, TaskData data)
     {
-        //m_actionNameURL = "addGamerLevelChanges";
-        m_actionNameURL = "addGamerLevelChangesBatch";
         DateTime chDateTime = time.AddDays(-1);
+        if(chDateTime <m_startTime)
+        {
+            Log.LogDebug("AddGamerLevelChanges post failed date:" + chDateTime.ToString());
+            return true;
+        }
+        m_actionNameURL = "addGamerLevelChangesBatch";
         //获取昨日升级的所有角色
         DataTable tbYesLevel = new DataTable();
         SqlStament st = SqlManager.GetInstance().GetSqlStament(SqlCommand.SELECT_ALLPLAYER_LEVELUP);
@@ -1383,10 +1474,14 @@ new MySql.Data.MySqlClient.MySqlParameter("?SvrAreaId",data.m_svr.m_SvrAreaId)};
     public bool AddGamerLevelLeft(DateTime time, TaskData data)
     {
         //7.1-(7.2-7.8(今天))
-       // m_actionNameURL = "addGamerLevelLeft";
-        m_actionNameURL = "addGamerLevelLeftBatch";
         //提交日志的时间
         DateTime leDateTime = time.AddDays(-7);
+        if(leDateTime < m_startTime)
+        {
+            Log.LogDebug("AddGamerLevelLeft post failed date:" + leDateTime.ToString());
+            return true;
+        }
+        m_actionNameURL = "addGamerLevelLeftBatch";
         string msg = "";
         //获取leDateTime当日的登录用户
         DataTable logRoleTb = new DataTable();
@@ -1538,6 +1633,8 @@ public class CornCost
     public Dictionary<string, DiamondPay> m_diamondPayMap = new Dictionary<string, DiamondPay>();
 
     public Dictionary<string, DiamondPresent> m_diamondPresentMap = new Dictionary<string, DiamondPresent>();
+
+    public DateTime m_startTime=new DateTime();
     public bool AddVirtualCornCost(DateTime time, TaskData data)
     {
         DateTime coDateTime = time;

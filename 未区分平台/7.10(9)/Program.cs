@@ -1,4 +1,4 @@
-﻿//#define _DEBUG
+﻿#define _DEBUG
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,6 +9,7 @@ using Newtonsoft.Json.Linq;
 using System.IO;
 using Newtonsoft.Json;
 using System.Threading;
+using System.Configuration;
 
 namespace ConsoleApplication1
 {
@@ -56,6 +57,9 @@ namespace ConsoleApplication1
 #endif
             try
             {
+                //读取开服时间
+                 string strStartTime =   ConfigurationManager.AppSettings["StartTime"];
+                 DateTime dtStartTime = Convert.ToDateTime(strStartTime);
                 //读取渠道列表
                 string readText = File.ReadAllText(m_channelConfigFile, System.Text.Encoding.Default);
                 //反序列化
@@ -169,7 +173,7 @@ namespace ConsoleApplication1
                    return false;
                }
 
-               if (!m_everydayTask.Init(m_svrList,m_chanList,m_diamondPayMap,m_diamondPresentMap))
+               if (!m_everydayTask.Init(m_svrList, m_chanList, m_diamondPayMap, m_diamondPresentMap, dtStartTime))
                {
                    return false;
                }
@@ -289,24 +293,24 @@ namespace ConsoleApplication1
         static void MyEveryDayTest(DateTime dtStart, DateTime dtEnd)
         {
             //收费测试
-            DateTime lastTime = dtStart;
-            DateTime FinTime = dtEnd;
-            DateTime nowTime = lastTime.AddMinutes(1);
-            while (nowTime <= FinTime)
-            {
-               AddUserRechargesTask(nowTime, lastTime);
-                lastTime = nowTime;
-                nowTime = nowTime.AddMinutes(1);
-            }
-            
-            //DateTime fiveStart = dtStart;
-            //for (; fiveStart <= dtEnd; )
+            //DateTime lastTime = dtStart;
+            //DateTime FinTime = dtEnd;
+            //DateTime nowTime = lastTime.AddMinutes(1);
+            //while (nowTime <= FinTime)
             //{
-            //    m_operationTask.RunTask(fiveStart);
-            //    fiveStart = fiveStart.AddDays(1);
+            //    AddUserRechargesTask(nowTime, lastTime);
+            //    lastTime = nowTime;
+            //    nowTime = nowTime.AddMinutes(1);
             //}
 
-            //每天任务测试
+            DateTime fiveStart = dtStart;
+            for (; fiveStart <= dtEnd; )
+            {
+                m_operationTask.RunTask(fiveStart);
+                fiveStart = fiveStart.AddDays(1);
+            }
+
+            ////每天任务测试
             //DateTime everyStart = dtStart;
             //for (; everyStart <= dtEnd; )
             //{
@@ -331,7 +335,7 @@ namespace ConsoleApplication1
             if(!Log.Init())
             {
                 Log.LogError("LoadLogConfig failed");
-                return;
+                //return;
             }
             if (!Init())
             {
@@ -340,8 +344,8 @@ namespace ConsoleApplication1
             }
 
             //test
-            DateTime dtStart = Convert.ToDateTime("2016-07-08 16:00:00");
-            DateTime dtEnd = Convert.ToDateTime("2016-07-08 19:00:00");
+            DateTime dtStart = Convert.ToDateTime("2016-08-11 11:30:00");
+            DateTime dtEnd = Convert.ToDateTime("2016-08-11 17:40:00");
             MyEveryDayTest(dtStart, dtEnd);
             //while (true)
             //{
