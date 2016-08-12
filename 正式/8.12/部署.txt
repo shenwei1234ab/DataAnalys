@@ -1,0 +1,12 @@
+部署流程：
+1.#define _DEBUG 去除宏开关
+2.配置App.config文件设置数据库访问地址
+3.根据服务器选择对应平台编译
+4.放入channel.txt和svrarea.txt配置文件
+5.放入DiamondPayRecord.txt，DiamondPresentRecord.txt配置文件
+6.放入MySql.Data.dll和Newtonsoft.Json.dll到程序运行目录
+7.运行程序，检查程序是否能运行有报错的话检查以上配置文件和MySql.Data.dll和Newtonsoft.Json.dll是否存在和配置正确
+
+
+
+
